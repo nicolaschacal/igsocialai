@@ -411,11 +411,22 @@ export const mcpHandler = createMcpHandler(() => {
         })).digest("hex");
         await db`UPDATE content_ideas SET status = 'ready_for_review', updated_at = NOW() WHERE id = ${ideaId}`;
         const approvals = await db`INSERT INTO approvals (content_idea_id, action, content_hash, status) VALUES (${ideaId}, ${action}, ${contentHash}, 'pending') RETURNING id, action, status, created_at`;
+        const baseUrlRaw = process.env.NEXT_PUBLIC_APP_URL || "";
+        const baseUrl = baseUrlRaw.endsWith("/") ? baseUrlRaw.slice(0, -1) : baseUrlRaw;
+        const previewExpires = Math.floor(Date.now() / 1000) + 60 * 60;
+        const reviewAssets = assets.map((asset) => {
+          const signature = signPublicMediaUrl(String(asset.id), previewExpires);
+          return {
+            id: asset.id,
+            type: asset.asset_type,
+            url: `${baseUrl}/api/media/public/${asset.id}?expires=${previewExpires}&sig=${signature}`,
+          };
+        });
         return result({
           requested: true,
           approval: approvals[0],
           content: { title: idea.title, format: idea.format, caption: idea.caption, cta: idea.cta, keyword: idea.keyword, resourceUrl: idea.resource_url, dmMessage: idea.dm_message, requiresFollow: idea.requires_follow },
-          assets: assets.map((asset) => ({ id: asset.id, type: asset.asset_type, url: asset.storage_url })),
+          assets: reviewAssets,
           hasCover,
           contentHash,
           note: "Show the preview and all publishing details to the creator. Only call content_approval_decide with decision=approve after they explicitly say yes.",
@@ -609,17 +620,23 @@ export const mcpHandler = createMcpHandler(() => {
         await db`UPDATE approvals SET published_media_id = ${publishedData.id}, published_at = NOW() WHERE id = ${approvalId} AND published_media_id IS NULL`;
         await db`UPDATE content_ideas SET status = 'published', updated_at = NOW() WHERE id = ${approval.content_idea_id}`;
         let automationRuleId: string | null = null;
+        let automationWarning: string | null = null;
         if (approval.keyword && approval.resource_url) {
-          const rules = await db`INSERT INTO automation_rules (creator_id, content_idea_id, instagram_media_id, rule_type, keyword, response_template, resource_url, requires_follow, enabled)
-            SELECT creator_id, ${approval.content_idea_id}, ${publishedData.id}, 'comment_keyword', ${approval.keyword},
-              ${approval.dm_message ?? "¡Gracias por comentar! Para recibir el recurso, seguime y tocá «Ya seguí»."},
-              ${approval.resource_url}, ${approval.requires_follow}, TRUE
-            FROM instagram_accounts WHERE instagram_user_id = ${account.instagram_user_id}
-            RETURNING id`;
-          automationRuleId = rules[0]?.id ? String(rules[0].id) : null;
+          try {
+            const rules = await db`INSERT INTO automation_rules (creator_id, content_idea_id, instagram_media_id, rule_type, keyword, response_template, resource_url, requires_follow, enabled)
+              SELECT creator_id, ${approval.content_idea_id}, ${publishedData.id}, 'comment_keyword', ${approval.keyword},
+                ${approval.dm_message ?? "¡Gracias por comentar! Para recibir el recurso, seguime y tocá «Ya seguí»."},
+                ${approval.resource_url}, ${approval.requires_follow}, TRUE
+              FROM instagram_accounts WHERE instagram_user_id = ${account.instagram_user_id}
+              RETURNING id`;
+            automationRuleId = rules[0]?.id ? String(rules[0].id) : null;
+            if (!automationRuleId) automationWarning = "Reel published, but the comment automation rule could not be created.";
+          } catch {
+            automationWarning = "Reel published, but the comment automation rule could not be created.";
+          }
         }
         await db`INSERT INTO audit_log (actor, action, target_type, target_id, details) VALUES ('system', 'instagram_reel_published', 'instagram_media', ${publishedData.id}, ${JSON.stringify({ approvalId, contentIdeaId: approval.content_idea_id, title: approval.title })}::jsonb)`;
-        return result({ published: true, instagramMediaId: publishedData.id, title: approval.title, approvalId, commentAutomationRuleId: automationRuleId, commentAutomationEnabled: Boolean(automationRuleId) });
+        return result({ published: true, instagramMediaId: publishedData.id, title: approval.title, approvalId, commentAutomationRuleId: automationRuleId, commentAutomationEnabled: Boolean(automationRuleId), automationWarning });
       } catch {
         return result({ published: false, error: "Could not finalize Instagram publication. Verify token, permissions, container state, and audit storage." });
       }
