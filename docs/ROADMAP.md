@@ -9,9 +9,9 @@
 
 ## M1 — Instagram connection
 - [ ] Create Meta developer app
-- [ ] Configure Instagram professional account OAuth
-- [ ] Implement state-protected OAuth callback
-- [ ] Store encrypted tokens
+- [x] Scaffold Instagram professional account OAuth (requires Meta credentials and live tester authorization)
+- [x] Implement signed state-protected OAuth callback
+- [x] Store encrypted long-lived tokens in Neon
 - [ ] Read account profile and recent media
 - [ ] Add token health and disconnect flow
 
