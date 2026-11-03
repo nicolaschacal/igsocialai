@@ -442,7 +442,7 @@ export const mcpHandler = createMcpHandler(() => {
         const assets = await db`SELECT id, asset_type, storage_url, metadata FROM media_assets WHERE content_idea_id = ${approval.content_idea_id} ORDER BY created_at ASC`;
         const video = assets.find((asset) => asset.asset_type === "video");
         const cover = assets.find((asset) => asset.asset_type === "cover");
-        if (!video) return result({ prepared: false, reason: "Rendered Reel video asset is missing." });
+        if (!video || !cover) return result({ prepared: false, reason: "Rendered Reel video and cover assets are required." });
 
         const ideaSnapshot = {
           id: approval.content_idea_id, format: approval.format, title: approval.title, hook: approval.hook,
