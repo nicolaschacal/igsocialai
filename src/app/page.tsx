@@ -2,7 +2,7 @@ import { Activity, ArrowUpRight, Bot, CheckCircle2, Circle, Instagram, KeyRound,
 
 const steps = [
   { title: "Database", detail: "Persist ideas, approvals, account state and daily reports.", configured: Boolean(process.env.DATABASE_URL), icon: Activity },
-  { title: "Instagram / Meta", detail: "Connect a professional Creator or Business account using official OAuth.", configured: Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET), icon: Instagram },
+  { title: "Meta OAuth app", detail: "Configure your Instagram Business Login app credentials.", configured: Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET), icon: Instagram },
   { title: "Claude MCP", detail: "Connect Claude to your private creator agent endpoint.", configured: Boolean(process.env.MCP_ACCESS_TOKEN), icon: Bot },
   { title: "ElevenLabs", detail: "Generate narration with your selected voice.", configured: Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID), icon: Mic2 },
   { title: "Credential encryption", detail: "Protect provider tokens before storing them.", configured: Boolean(process.env.APP_ENCRYPTION_KEY), icon: KeyRound },
@@ -13,6 +13,7 @@ export default function Home() {
   const baseUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
   const mcpUrl = `${baseUrl}/api/mcp`;
   const ready = steps.filter((step) => step.configured).length;
+  const canStartInstagramOAuth = Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.APP_ENCRYPTION_KEY && process.env.DATABASE_URL);
 
   return (
     <main className="min-h-screen bg-[#0e1118] text-[#f4f5f9]">
@@ -39,7 +40,11 @@ export default function Home() {
           </div>
           <div className="rounded-2xl border border-violet-300/20 bg-gradient-to-br from-[#211e37] to-[#151925] p-6 shadow-2xl shadow-violet-950/20">
             <div className="flex items-center justify-between"><div className="text-sm font-semibold">Claude workspace</div><div className="flex items-center gap-1.5 text-[10px] text-amber-200"><span className="h-1.5 w-1.5 rounded-full bg-amber-300"/> Setup in progress</div></div>
-            <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-violet-300/20 bg-violet-300/[.06] p-4">
+            <div><div className="text-sm font-semibold">Connect your Instagram account</div><div className="mt-1 text-xs text-slate-400">Requires a professional Creator or Business account and approved Meta permissions.</div></div>
+            {canStartInstagramOAuth ? <a href="/api/auth/instagram" className="rounded-lg bg-violet-400 px-4 py-2.5 text-xs font-semibold text-[#11121a]">Connect Instagram <ArrowUpRight size={13} className="ml-1 inline"/></a> : <span className="text-xs text-slate-500">Meta, database and encryption settings pending</span>}
+          </div>
+          <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
               <div className="text-[10px] font-semibold tracking-widest text-violet-300">07:00 · DAILY BRIEFING</div>
               <p className="mt-3 text-sm font-medium">Good morning. I reviewed your account and your niche.</p>
               <p className="mt-2 text-xs leading-5 text-slate-400">Here are the changes in audience behavior, what is working, and three video concepts worth making today.</p>
