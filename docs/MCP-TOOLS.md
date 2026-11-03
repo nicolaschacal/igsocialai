@@ -37,6 +37,7 @@ Tools are grouped by risk. Execution tools must validate account ownership, user
 
 ## Execute approved actions
 - instagram_publish_approved
+- instagram_publish_finalize
 - instagram_schedule_approved
 - instagram_reply_to_comment_under_policy
 - instagram_send_private_reply_under_policy
