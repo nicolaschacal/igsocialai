@@ -78,11 +78,17 @@ export const DailyReel: React.FC<DailyReelProps> = ({
   durationInFrames,
   scenes,
 }) => {
-  const perScene = Math.floor(durationInFrames / Math.max(scenes.length, 1));
+  let nextStart = 0;
+  const sequences = scenes.map((scene, index) => {
+    const duration = scene.durationFrames ?? Math.floor(durationInFrames / Math.max(scenes.length, 1));
+    const start = nextStart;
+    nextStart += duration;
+    return { scene, index, start, duration };
+  });
   return (
     <AbsoluteFill style={{ backgroundColor, fontFamily: "Arial, Helvetica, sans-serif" }}>
-      {scenes.map((scene, index) => (
-        <Sequence key={`${index}-${scene.headline}`} from={index * perScene} durationInFrames={perScene}>
+      {sequences.map(({ scene, index, start, duration }) => (
+        <Sequence key={`${index}-${scene.headline}`} from={start} durationInFrames={duration}>
           <SceneCard scene={scene} index={index} accentColor={accentColor} backgroundColor={backgroundColor} handle={handle}/>
         </Sequence>
       ))}
