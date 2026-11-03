@@ -10,7 +10,7 @@ export function LegalPage({
   updated?: string;
   children: ReactNode;
 }) {
-  const contactEmail = process.env.PRIVACY_CONTACT_EMAIL?.trim();
+  const contactEmail = process.env.PRIVACY_CONTACT_EMAIL?.trim() || "support@heey.me";
 
   return (
     <main className="min-h-screen bg-[#0e1118] px-5 py-12 text-[#f4f5f9] md:px-8">
