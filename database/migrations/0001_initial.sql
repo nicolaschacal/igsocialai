@@ -127,3 +127,11 @@ CREATE TABLE IF NOT EXISTS media_asset_blobs (
 ALTER TABLE approvals ADD COLUMN IF NOT EXISTS provider_container_id TEXT;
 ALTER TABLE approvals ADD COLUMN IF NOT EXISTS published_media_id TEXT;
 ALTER TABLE approvals ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+
+-- Add per-content lead-magnet settings and link automation rules to published media.
+ALTER TABLE content_ideas ADD COLUMN IF NOT EXISTS resource_url TEXT;
+ALTER TABLE content_ideas ADD COLUMN IF NOT EXISTS dm_message TEXT;
+ALTER TABLE content_ideas ADD COLUMN IF NOT EXISTS requires_follow BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS instagram_media_id TEXT;
+ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS content_idea_id UUID REFERENCES content_ideas(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS automation_rules_media_keyword_idx ON automation_rules(instagram_media_id, keyword) WHERE enabled = TRUE;
