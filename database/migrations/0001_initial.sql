@@ -150,3 +150,19 @@ CREATE TABLE IF NOT EXISTS automation_contact_states (
   UNIQUE (automation_rule_id, contact_igsid)
 );
 CREATE INDEX IF NOT EXISTS automation_contact_states_contact_idx ON automation_contact_states(contact_igsid, updated_at DESC);
+
+-- Local workstation render queue. The user's PC consumes queued jobs without a paid cloud renderer.
+CREATE TABLE IF NOT EXISTS render_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  content_idea_id UUID NOT NULL REFERENCES content_ideas(id) ON DELETE CASCADE,
+  voiceover_asset_id UUID NOT NULL REFERENCES media_assets(id) ON DELETE RESTRICT,
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'completed', 'failed')),
+  video_asset_id UUID REFERENCES media_assets(id) ON DELETE SET NULL,
+  cover_asset_id UUID REFERENCES media_assets(id) ON DELETE SET NULL,
+  error_message TEXT,
+  started_at TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS render_jobs_queue_idx ON render_jobs(status, created_at) WHERE status = 'queued';
