@@ -9,7 +9,7 @@ The primary product experience is Claude Cowork: a 07:00 scheduled briefing, thr
 - Next.js setup portal
 - Remote MCP endpoint: `/api/mcp` (Streamable HTTP, private Bearer token for development)
 - MCP tools for workspace status, Instagram profile/recent-media data, saving/listing/selecting content ideas, approvals, and ElevenLabs voice generation
-- Instagram Login OAuth scaffold with signed state and AES-256-GCM encrypted long-lived token storage
+- Instagram API Unified Login OAuth using Facebook Login for Business config_id, signed state, assigned Instagram account discovery, and AES-256-GCM encrypted business token storage
 - Neon Postgres schema for creator settings, Instagram accounts, content ideas, assets, approvals, automation rules, reports, webhooks, audit logs, and audio payloads
 - Local Remotion 9:16 motion-graphics template and protected voiceover download / render runner
 - Claude Cowork daily schedule prompt in `docs/CLAUDE-SCHEDULE-PROMPT.md`
@@ -31,9 +31,10 @@ Set these in Vercel → Project → Settings → Environment Variables, and in `
 - `DATABASE_URL`: pooled Neon Postgres connection string for the `igsocialai` project.
 - `MCP_ACCESS_TOKEN`: long random secret used to protect the private MCP endpoint.
 - `APP_ENCRYPTION_KEY`: 32 random bytes encoded as 64 hexadecimal characters. Used for OAuth state signing and AES-256-GCM encryption.
-- `META_APP_ID`: Instagram App ID from Instagram → API setup with Instagram Login (not the generic Meta App ID shown in App Settings → Basic).
-- `META_APP_SECRET`: matching Instagram App Secret.
-- `META_REDIRECT_URI`: exactly `https://igsocialai.vercel.app/api/auth/instagram/callback`.
+- `META_APP_ID`: Meta App ID from App Settings → Basic.
+- `META_APP_SECRET`: matching Meta App Secret from App Settings → Basic.
+- `META_CONFIG_ID`: Configuration ID created under Instagram API → Unified Login / Facebook Login for Business. This configuration must include the Instagram permissions used by the app and the Instagram professional account asset.
+- `META_REDIRECT_URI`: exactly `https://igsocialai.vercel.app/api/auth/instagram/callback`, registered in the Unified Login configuration.
 - `META_GRAPH_API_VERSION`: `v26.0`.
 - `META_VERIFY_TOKEN`: random webhook verification token; also enter the same value in Meta's webhook configuration.
 - `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`: required for voice generation.
@@ -63,7 +64,7 @@ After connecting, enable the connector in Cowork and create the daily scheduled 
 
 ## Connect Instagram
 
-Create a Meta app with the Instagram Business Login use case. Add this exact callback URI:
+Use the Meta app’s Instagram API with Unified Login configuration (Facebook Login for Business). Add this exact callback URI:
 
 ```
 https://igsocialai.vercel.app/api/auth/instagram/callback
