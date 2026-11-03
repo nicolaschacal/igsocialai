@@ -312,9 +312,12 @@ export const mcpHandler = createMcpHandler(() => {
         caption: z.string().max(3000).optional(),
         cta: z.string().max(500).optional(),
         keyword: z.string().max(80).optional(),
+        resourceUrl: z.string().url().max(2000).optional(),
+        dmMessage: z.string().max(1000).optional(),
+        requiresFollow: z.boolean().optional(),
       }).refine((value) => Object.keys(value).some((key) => key !== "ideaId" && value[key as keyof typeof value] !== undefined)),
     },
-    async ({ ideaId, script, storyboard, caption, cta, keyword }) => {
+    async ({ ideaId, script, storyboard, caption, cta, keyword, resourceUrl, dmMessage, requiresFollow }) => {
       if (!db) return result({ error: databaseUnavailableMessage() });
       try {
         const storyboardJson = storyboard ? JSON.stringify(storyboard) : null;
@@ -324,10 +327,13 @@ export const mcpHandler = createMcpHandler(() => {
           caption = COALESCE(${caption ?? null}, caption),
           cta = COALESCE(${cta ?? null}, cta),
           keyword = COALESCE(${keyword ?? null}, keyword),
+          resource_url = COALESCE(${resourceUrl ?? null}, resource_url),
+          dm_message = COALESCE(${dmMessage ?? null}, dm_message),
+          requires_follow = COALESCE(${requiresFollow ?? null}, requires_follow),
           status = 'in_production',
           updated_at = NOW()
           WHERE id = ${ideaId} AND status IN ('selected', 'in_production', 'ready_for_review')
-          RETURNING id, title, format, script, storyboard, caption, cta, keyword, status`;
+          RETURNING id, title, format, script, storyboard, caption, cta, keyword, resource_url, dm_message, requires_follow, status`;
         if (!rows.length) return result({ updated: false, reason: "Idea not found or not in a production state." });
         return result({ updated: true, idea: rows[0], nextStep: "Generate the voiceover and render the video. Then request explicit creator approval." });
       } catch {
@@ -349,7 +355,7 @@ export const mcpHandler = createMcpHandler(() => {
     async ({ ideaId, action }) => {
       if (!db) return result({ error: databaseUnavailableMessage() });
       try {
-        const ideas = await db`SELECT id, format, title, hook, summary, script, storyboard, caption, cta, keyword, status FROM content_ideas WHERE id = ${ideaId} LIMIT 1`;
+        const ideas = await db`SELECT id, format, title, hook, summary, script, storyboard, caption, cta, keyword, resource_url, dm_message, requires_follow, status FROM content_ideas WHERE id = ${ideaId} LIMIT 1`;
         const idea = ideas[0];
         if (!idea) return result({ requested: false, reason: "Content idea not found." });
         const assets = await db`SELECT id, asset_type, storage_url, metadata FROM media_assets WHERE content_idea_id = ${ideaId} ORDER BY created_at ASC`;
@@ -364,6 +370,7 @@ export const mcpHandler = createMcpHandler(() => {
           id: idea.id, format: idea.format, title: idea.title, hook: idea.hook,
           summary: idea.summary, script: idea.script, storyboard: idea.storyboard,
           caption: idea.caption, cta: idea.cta, keyword: idea.keyword,
+          resource_url: idea.resource_url, dm_message: idea.dm_message, requires_follow: idea.requires_follow,
         };
         const assetSnapshot = assets.map((asset) => ({
           id: asset.id, type: asset.asset_type, storageUrl: asset.storage_url, metadata: asset.metadata,
@@ -377,7 +384,7 @@ export const mcpHandler = createMcpHandler(() => {
         return result({
           requested: true,
           approval: approvals[0],
-          content: { title: idea.title, format: idea.format, caption: idea.caption, cta: idea.cta, keyword: idea.keyword },
+          content: { title: idea.title, format: idea.format, caption: idea.caption, cta: idea.cta, keyword: idea.keyword, resourceUrl: idea.resource_url, dmMessage: idea.dm_message, requiresFollow: idea.requires_follow },
           assets: assets.map((asset) => ({ id: asset.id, type: asset.asset_type, url: asset.storage_url })),
           hasCover,
           contentHash,
@@ -430,7 +437,7 @@ export const mcpHandler = createMcpHandler(() => {
       if (!db) return result({ error: databaseUnavailableMessage() });
       try {
         const rows = await db`SELECT a.id, a.content_idea_id, a.action, a.status, a.content_hash, a.provider_container_id, a.published_media_id,
-          i.format, i.title, i.hook, i.summary, i.script, i.storyboard, i.caption, i.cta, i.keyword
+          i.format, i.title, i.hook, i.summary, i.script, i.storyboard, i.caption, i.cta, i.keyword, i.resource_url, i.dm_message, i.requires_follow
           FROM approvals a JOIN content_ideas i ON i.id = a.content_idea_id WHERE a.id = ${approvalId} LIMIT 1`;
         const approval = rows[0] as Record<string, unknown> | undefined;
         if (!approval) return result({ prepared: false, reason: "Approval request not found." });
@@ -448,6 +455,7 @@ export const mcpHandler = createMcpHandler(() => {
           id: approval.content_idea_id, format: approval.format, title: approval.title, hook: approval.hook,
           summary: approval.summary, script: approval.script, storyboard: approval.storyboard,
           caption: approval.caption, cta: approval.cta, keyword: approval.keyword,
+          resource_url: approval.resource_url, dm_message: approval.dm_message, requires_follow: approval.requires_follow,
         };
         const assetSnapshot = assets.map((asset) => ({
           id: asset.id, type: asset.asset_type, storageUrl: asset.storage_url, metadata: asset.metadata,
