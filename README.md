@@ -1,18 +1,20 @@
 # IG Social AI
 
-**Your Instagram creator agent, operated from Claude.**
+**Your Instagram creator agent, operated from Claude Cowork.**
 
 The primary product experience is Claude Cowork: a 07:00 scheduled briefing, three content concepts, creator-approved production, and community operations. Cowork's scheduled task is the initial daily orchestrator; the app exposes remote MCP tools. The web app is a small connection and settings surface — not a traditional social-media dashboard.
 
 ## Current foundation
 
-- Next.js app shell and setup page
-- Remote MCP endpoint: `/api/mcp` (Streamable HTTP)
-- Initial MCP tools for workspace status, saving/listing/selecting content ideas, and listing approvals
-- Neon Postgres schema for creator settings, Instagram accounts, content ideas, assets, approvals, automation rules, reports, webhooks, and audit logs
-- Product, daily workflow, integration constraints, and roadmap documentation
+- Next.js setup portal
+- Remote MCP endpoint: `/api/mcp` (Streamable HTTP, private Bearer token for development)
+- MCP tools for workspace status, Instagram profile/recent-media data, saving/listing/selecting content ideas, approvals, and ElevenLabs voice generation
+- Instagram Login OAuth scaffold with signed state and AES-256-GCM encrypted long-lived token storage
+- Neon Postgres schema for creator settings, Instagram accounts, content ideas, assets, approvals, automation rules, reports, webhooks, audit logs, and audio payloads
+- Local Remotion 9:16 motion-graphics template and protected voiceover download / render runner
+- Claude Cowork daily schedule prompt in `docs/CLAUDE-SCHEDULE-PROMPT.md`
 
-**This is a foundation, not yet a connected Instagram automation product.** Instagram OAuth, real insights, media rendering, publishing, messaging, and scheduler are still to be implemented.
+**This is a foundation, not yet a fully connected Instagram automation product.** Live Meta login, insights, publishing, comment/DM webhooks and automation, content approval execution, and the final end-to-end render flow still need credentials, permissions, implementation, and testing.
 
 ## Local development
 
@@ -22,27 +24,63 @@ cp .env.example .env.local
 npm run dev
 ```
 
-## Required configuration
+## Required environment variables
 
-- `DATABASE_URL`: Neon Postgres connection string
-- `MCP_ACCESS_TOKEN`: long random secret used to protect the private development MCP endpoint
-- `APP_ENCRYPTION_KEY`: 32-byte key encoded as 64 hexadecimal characters; encrypt provider credentials before storing them
-- `META_APP_ID`, `META_APP_SECRET`, `META_REDIRECT_URI`: Meta developer app credentials (not yet wired)
-- `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`: voice generation (not yet wired)
+Set these in Vercel → Project → Settings → Environment Variables, and in `.env.local` for local rendering:
 
-Apply `database/migrations/0001_initial.sql` to the Neon database before using database-backed MCP tools.
+- `DATABASE_URL`: pooled Neon Postgres connection string for the `igsocialai` project.
+- `MCP_ACCESS_TOKEN`: long random secret used to protect the private MCP endpoint.
+- `APP_ENCRYPTION_KEY`: 32 random bytes encoded as 64 hexadecimal characters. Used for OAuth state signing and AES-256-GCM encryption.
+- `META_APP_ID`: Instagram App ID from Instagram → API setup with Instagram Login (not the generic Meta App ID shown in App Settings → Basic).
+- `META_APP_SECRET`: matching Instagram App Secret.
+- `META_REDIRECT_URI`: exactly `https://igsocialai.vercel.app/api/auth/instagram/callback`.
+- `META_GRAPH_API_VERSION`: `v26.0`.
+- `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`: required for voice generation.
+- `NEXT_PUBLIC_APP_URL`: `https://igsocialai.vercel.app`.
+- `IGSOCIALAI_URL`: same URL, used by the local renderer.
 
-## Claude connection
+Generate the two random secrets on a computer with Node.js:
 
-Once deployed, configure a remote MCP connector in Claude using:
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Run it twice: one output for `MCP_ACCESS_TOKEN`, one for `APP_ENCRYPTION_KEY`. Do not commit either value.
+
+Apply `database/migrations/0001_initial.sql` to the Neon database before using database-backed MCP tools. The initial schema and media-asset table have already been created in the dedicated Neon project.
+
+## Connect Claude
+
+Add a custom remote MCP connector in Claude:
+
+- Name: `IG Social AI`
+- Server URL: `https://igsocialai.vercel.app/api/mcp`
+- Authentication: request header `Authorization: Bearer YOUR_MCP_ACCESS_TOKEN`
+
+Claude supports fixed request headers for remote MCP servers. After connecting, enable the connector in Cowork and create the daily scheduled task using `docs/CLAUDE-SCHEDULE-PROMPT.md`.
+
+## Connect Instagram
+
+Create a Meta app with the Instagram Business Login use case. Add this exact callback URI:
 
 ```
-https://YOUR-APP-DOMAIN/api/mcp
+https://igsocialai.vercel.app/api/auth/instagram/callback
 ```
 
-The current development endpoint expects an Authorization Bearer token matching `MCP_ACCESS_TOKEN`. This single-token approach is only for private development. Before offering the product to customers, replace it with per-user OAuth, tenant isolation, and account-level authorization.
+For initial testing, add your own Instagram professional account as an app tester and accept the invitation. Production customers require the relevant Meta App Review / Advanced Access.
 
-## Non-negotiable safety boundaries
+## Render a Reel locally
+
+```powershell
+npm install
+Copy-Item public/reel-props.example.json public/reel-props.json
+npm run studio
+npm run render:reel -- YOUR_VOICEOVER_ASSET_ID
+```
+
+The local render script downloads the generated audio from the protected app endpoint and renders `out/reel.mp4` using Remotion. See `docs/VIDEO-RENDERING.md` and `docs/ELEVENLABS.md`.
+
+## Safety boundaries
 
 - Never collect Instagram passwords or scrape private account data.
 - Use official Meta APIs and obtain required permissions/app review.
@@ -54,4 +92,4 @@ The current development endpoint expects an Authorization Bearer token matching 
 
 ## Cost reality
 
-Claude's consumer subscription is used interactively in Claude. It is not a server-side API credential for unattended AI runs. Free tiers can support an early prototype, but ElevenLabs, hosting, database/storage quotas, and unattended model calls have separate limits and may incur costs.
+Claude Cowork scheduled tasks can run the daily AI briefing remotely using the user's paid Claude plan and connected MCP tools. That avoids a separate Claude API bill for the initial workflow, but uses Claude plan limits. Neon and Vercel free tiers may be sufficient for an early single-user prototype. ElevenLabs has finite free credits; video rendering is local. Free quotas and provider terms can change.
