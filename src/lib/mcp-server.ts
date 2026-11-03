@@ -82,7 +82,7 @@ export const mcpHandler = createMcpHandler(() => {
         }
 
         const accessToken = decryptSecret(account.access_token_encrypted);
-        const version = process.env.META_GRAPH_API_VERSION || "v25.0";
+        const version = process.env.META_GRAPH_API_VERSION || "v26.0";
         const profileUrl = new URL(`https://graph.instagram.com/${version}/me`);
         profileUrl.searchParams.set("fields", "user_id,username,account_type,media_count,followers_count,follows_count,biography,website,profile_picture_url");
         profileUrl.searchParams.set("access_token", accessToken);
