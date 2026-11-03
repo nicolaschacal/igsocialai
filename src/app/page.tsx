@@ -2,7 +2,7 @@ import { Activity, ArrowUpRight, Bot, CheckCircle2, Circle, Instagram, KeyRound,
 
 const steps = [
   { title: "Database", detail: "Persist ideas, approvals, account state and daily reports.", configured: Boolean(process.env.DATABASE_URL), icon: Activity },
-  { title: "Meta OAuth app", detail: "Configure your Instagram Business Login app credentials.", configured: Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET), icon: Instagram },
+  { title: "Meta OAuth app", detail: "Configure Meta App ID, App Secret and Unified Login configuration.", configured: Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_CONFIG_ID), icon: Instagram },
   { title: "Claude MCP", detail: "Connect Claude to your private creator agent endpoint.", configured: Boolean(process.env.MCP_ACCESS_TOKEN), icon: Bot },
   { title: "ElevenLabs", detail: "Generate narration with your selected voice.", configured: Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID), icon: Mic2 },
   { title: "Credential encryption", detail: "Protect provider tokens before storing them.", configured: Boolean(process.env.APP_ENCRYPTION_KEY), icon: KeyRound },
@@ -13,7 +13,7 @@ export default function Home() {
   const baseUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
   const mcpUrl = `${baseUrl}/api/mcp`;
   const ready = steps.filter((step) => step.configured).length;
-  const canStartInstagramOAuth = Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.APP_ENCRYPTION_KEY && process.env.DATABASE_URL);
+  const canStartInstagramOAuth = Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_CONFIG_ID && process.env.APP_ENCRYPTION_KEY && process.env.DATABASE_URL);
 
   return (
     <main className="min-h-screen bg-[#0e1118] text-[#f4f5f9]">
