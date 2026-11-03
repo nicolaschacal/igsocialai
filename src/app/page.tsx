@@ -1,53 +1,74 @@
-import {
-  Activity, ArrowUpRight, AudioLines, Bot, CalendarDays, Check,
-  ChevronRight, CircleHelp, Clapperboard, Clock3, Command, Film,
-  Instagram, MessageCircle, Plus, Settings2, ShieldCheck, Sparkles,
-  TrendingUp, Users, WandSparkles
-} from "lucide-react";
+import { Activity, ArrowUpRight, Bot, CheckCircle2, Circle, Instagram, KeyRound, Mic2, ShieldCheck, Sparkles } from "lucide-react";
 
-const tasks = [
-  { time: "09:30", type: "REEL", title: "La nube no es tan nube como crees", detail: "Motion graphics · 32 segundos", status: "Pendiente de aprobación", color: "violet" },
-  { time: "13:00", type: "CARRUSEL", title: "5 herramientas de IA que sí uso", detail: "7 diapositivas · Educación", status: "Borrador listo", color: "blue" },
-  { time: "19:00", type: "STORIES", title: "¿Qué parte de la IA te interesa más?", detail: "Encuesta · 3 historias", status: "En preparación", color: "mint" }
+const steps = [
+  { title: "Database", detail: "Persist ideas, approvals, account state and daily reports.", configured: Boolean(process.env.DATABASE_URL), icon: Activity },
+  { title: "Instagram / Meta", detail: "Connect a professional Creator or Business account using official OAuth.", configured: Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET), icon: Instagram },
+  { title: "Claude MCP", detail: "Connect Claude to your private creator agent endpoint.", configured: Boolean(process.env.MCP_ACCESS_TOKEN), icon: Bot },
+  { title: "ElevenLabs", detail: "Generate narration with your selected voice.", configured: Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID), icon: Mic2 },
+  { title: "Credential encryption", detail: "Protect provider tokens before storing them.", configured: Boolean(process.env.APP_ENCRYPTION_KEY), icon: KeyRound },
 ];
 
-function Metric({ label, value, change, icon: Icon }: { label: string; value: string; change: string; icon: typeof Activity }) {
-  return <div className="metric"><div className="metric-top"><span>{label}</span><Icon size={17}/></div><strong>{value}</strong><small>{change}</small></div>;
-}
-
 export default function Home() {
-  return (
-    <main className="shell">
-      <aside className="sidebar">
-        <div className="brand"><div className="brand-mark"><Instagram size={19}/></div><div><b>ig social<span>ai</span></b><small>CREATOR WORKSPACE</small></div></div>
-        <div className="account"><div className="avatar">N</div><div><b>@nickdhq</b><small>Instagram Creator</small></div><span className="online"/></div>
-        <div className="nav-label">WORKSPACE</div>
-        <a className="nav active"><Activity size={17}/> Overview</a>
-        <a className="nav"><TrendingUp size={17}/> Niche & analytics</a>
-        <a className="nav"><Clapperboard size={17}/> Content studio</a>
-        <a className="nav"><CalendarDays size={17}/> Calendar</a>
-        <a className="nav"><MessageCircle size={17}/> Inbox & automations <i>0</i></a>
-        <div className="nav-label second">SYSTEM</div>
-        <a className="nav"><Bot size={17}/> Claude MCP</a>
-        <a className="nav"><Settings2 size={17}/> Settings</a>
-        <div className="sidebar-bottom"><div className="claude-card"><div className="claude-icon"><Sparkles size={16}/></div><b>Claude connected?</b><p>Connect your workspace to let Claude plan and prepare content.</p><button>Set up connection <ArrowUpRight size={14}/></button></div><div className="help"><CircleHelp size={15}/> Help center <span>v0.1.0</span></div></div>
-      </aside>
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const mcpUrl = `${appUrl.replace(/\\/$/, "")}/api/mcp`;
+  const ready = steps.filter((step) => step.configured).length;
 
-      <section className="main">
-        <header className="topbar"><div><span className="crumb">Workspace</span><ChevronRight size={14}/><b>Overview</b></div><div className="top-actions"><span className="live-dot"/> <span>System operational</span><button className="icon-btn"><Settings2 size={17}/></button><div className="avatar small">N</div></div></header>
-        <div className="content">
-          <section className="welcome"><div><div className="eyebrow"><span className="sparkle">✳</span> YOUR CREATOR OPERATING SYSTEM</div><h1>Good afternoon, Nicolás<span>.</span></h1><p>Your content engine is ready. Let’s make something worth watching.</p></div><button className="primary"><Plus size={17}/> New content</button></section>
-          <section className="hero">
-            <div className="hero-copy"><div className="hero-kicker"><WandSparkles size={14}/> CLAUDE WORKSPACE</div><h2>One brief.<br/><em>A week of content.</em></h2><p>Claude learns your niche, develops the ideas and prepares every asset. You stay in control of what goes live.</p><button className="hero-btn">Start a content plan <ArrowUpRight size={15}/></button></div>
-            <div className="hero-art"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="art-core"><Sparkles size={35}/></div><div className="float-card card-a"><Film size={16}/><span>Motion graphics</span><Check size={14}/></div><div className="float-card card-b"><AudioLines size={16}/><span>Voiceover ready</span></div><div className="float-card card-c"><ShieldCheck size={16}/><span>Your approval required</span></div></div>
-          </section>
-          <section className="metrics"><Metric label="FOLLOWERS" value="—" change="Connect Instagram to load insights" icon={Users}/><Metric label="ENGAGEMENT RATE" value="—" change="Waiting for account data" icon={TrendingUp}/><Metric label="CONTENT READY" value="0" change="No drafts yet" icon={Clapperboard}/><Metric label="APPROVAL QUEUE" value="0" change="Nothing waiting for review" icon={ShieldCheck}/></section>
-          <section className="section-head"><div><h3>Today’s production</h3><p>Your proposed content schedule</p></div><button className="text-btn">Open calendar <ArrowUpRight size={14}/></button></section>
-          <section className="task-list">{tasks.map((task) => <article className="task" key={task.title}><div className="task-time"><Clock3 size={14}/>{task.time}</div><div className={`task-icon ${task.color}`}>{task.type === "REEL" ? <Film size={19}/> : task.type === "CARRUSEL" ? <Clapperboard size={19}/> : <Sparkles size={19}/>}</div><div className="task-info"><div className="task-type">{task.type}</div><h4>{task.title}</h4><p>{task.detail}</p></div><div className="task-status"><span className="status-dot"/>{task.status}</div><button className="more">•••</button></article>)}</section>
-          <section className="bottom-grid"><div className="panel"><div className="panel-head"><div><h3>Automation activity</h3><p>What your agent is handling</p></div><span className="paused">NOT CONNECTED</span></div><div className="empty"><div className="empty-icon"><Bot size={22}/></div><b>Your agent is waiting for access</b><p>Connect Instagram and Claude to start automating your workflow.</p></div></div><div className="panel"><div className="panel-head"><div><h3>Approval center</h3><p>Nothing publishes without your OK</p></div><ShieldCheck size={18}/></div><div className="approval-empty"><div className="approval-check"><Check size={18}/></div><div><b>All clear</b><p>Your approval queue is empty.</p></div></div><div className="secure-note"><ShieldCheck size={14}/> Publishing is always approval-gated.</div></div></section>
-          <footer><span>IG SOCIAL AI <b>·</b> BUILT FOR CREATORS</span><span>Designed to work with Claude <Command size={12}/></span></footer>
-        </div>
-      </section>
+  return (
+    <main className="min-h-screen bg-[#0e1118] text-[#f4f5f9]">
+      <div className="mx-auto max-w-5xl px-6 py-10 md:px-10">
+        <header className="flex items-center justify-between border-b border-white/10 pb-7">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-violet-500 text-white"><Instagram size={20}/></div>
+            <div><div className="text-lg font-semibold tracking-tight">ig social<span className="text-violet-400">ai</span></div><div className="text-[9px] tracking-[.2em] text-slate-500">YOUR CREATOR AGENT</div></div>
+          </div>
+          <div className="rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1.5 text-xs text-violet-200">Private beta · v0.2</div>
+        </header>
+
+        <section className="grid gap-10 py-14 md:grid-cols-[1.1fr_.9fr] md:items-center">
+          <div>
+            <div className="mb-4 flex items-center gap-2 text-xs font-semibold tracking-[.18em] text-violet-300"><Sparkles size={14}/> CLAUDE IS THE INTERFACE</div>
+            <h1 className="max-w-xl text-4xl font-semibold leading-[1.08] tracking-[-.04em] md:text-5xl">Your Instagram.<br/><span className="text-violet-300">On autopilot.</span><br/>With your approval.</h1>
+            <p className="mt-5 max-w-lg text-sm leading-7 text-slate-400">Your agent studies your account and niche, proposes three ideas every morning, produces the Reel, voiceover, cover and caption, then waits for your approval before publishing.</p>
+            <div className="mt-7 flex flex-wrap gap-3 text-xs text-slate-300">
+              <span className="rounded-lg border border-white/10 bg-white/[.04] px-3 py-2">01 · Analyze</span>
+              <span className="rounded-lg border border-white/10 bg-white/[.04] px-3 py-2">02 · Create</span>
+              <span className="rounded-lg border border-white/10 bg-white/[.04] px-3 py-2">03 · Approve</span>
+              <span className="rounded-lg border border-white/10 bg-white/[.04] px-3 py-2">04 · Publish & engage</span>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-violet-300/20 bg-gradient-to-br from-[#211e37] to-[#151925] p-6 shadow-2xl shadow-violet-950/20">
+            <div className="flex items-center justify-between"><div className="text-sm font-semibold">Claude workspace</div><div className="flex items-center gap-1.5 text-[10px] text-amber-200"><span className="h-1.5 w-1.5 rounded-full bg-amber-300"/> Setup in progress</div></div>
+            <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="text-[10px] font-semibold tracking-widest text-violet-300">07:00 · DAILY BRIEFING</div>
+              <p className="mt-3 text-sm font-medium">Good morning. I reviewed your account and your niche.</p>
+              <p className="mt-2 text-xs leading-5 text-slate-400">Here are the changes in audience behavior, what is working, and three video concepts worth making today.</p>
+              <div className="mt-4 space-y-2">{["01  The idea with the strongest hook","02  A practical tutorial","03  A timely niche trend"].map((idea) => <div key={idea} className="rounded-lg border border-white/10 bg-white/[.04] px-3 py-2 text-xs text-slate-300">{idea}</div>)}</div>
+            </div>
+            <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-400"><ShieldCheck size={14} className="text-emerald-300"/> Nothing publishes without your approval.</div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-[#151a25] p-6 md:p-8">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div><div className="text-xs font-semibold tracking-widest text-slate-500">CONNECTION SETUP</div><h2 className="mt-2 text-xl font-semibold">Bring your agent online</h2><p className="mt-1 text-sm text-slate-400">Configured integrations: {ready} of {steps.length}</p></div>
+            <div className="h-1.5 w-36 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-violet-400" style={{width:`${(ready/steps.length)*100}%`}}/></div>
+          </div>
+          <div className="mt-6 divide-y divide-white/[.07]">
+            {steps.map(({title,detail,configured,icon:Icon}) => <div key={title} className="flex items-center gap-4 py-4">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[.05] text-slate-300"><Icon size={18}/></div>
+              <div className="min-w-0 flex-1"><div className="text-sm font-medium">{title}</div><div className="mt-1 text-xs text-slate-500">{detail}</div></div>
+              <div className={`flex items-center gap-1.5 text-xs ${configured ? "text-emerald-300" : "text-slate-500"}`}>{configured ? <CheckCircle2 size={15}/> : <Circle size={15}/>} {configured ? "Configured" : "Pending"}</div>
+            </div>)}
+          </div>
+          <div className="mt-6 rounded-xl border border-white/10 bg-black/20 p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-300"><Bot size={15} className="text-violet-300"/> Remote MCP endpoint</div>
+            <code className="mt-3 block break-all text-xs text-violet-200">{mcpUrl}</code>
+            <p className="mt-2 text-[11px] leading-5 text-slate-500">Add this URL as a custom connector in Claude. The private development endpoint also requires the configured Bearer token.</p>
+          </div>
+        </section>
+
+        <footer className="flex flex-wrap items-center justify-between gap-3 py-8 text-[10px] tracking-wider text-slate-600"><span>IG SOCIAL AI · BUILT FOR CREATORS</span><span className="flex items-center gap-2"><ArrowUpRight size={12}/> CLAUDE-FIRST WORKFLOW</span></footer>
+      </div>
     </main>
   );
 }
