@@ -58,6 +58,36 @@ export const mcpHandler = createMcpHandler(() => {
   );
 
   server.registerTool(
+    "instagram_subscribe_webhooks",
+    {
+      title: "Subscribe Instagram account to webhooks",
+      description: "Subscribe the connected Instagram professional account to comments, messages and messaging postbacks after the Meta app webhook is configured.",
+      inputSchema: z.object({}),
+    },
+    async () => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const accounts = await db`SELECT instagram_user_id, access_token_encrypted FROM instagram_accounts ORDER BY connected_at DESC LIMIT 1`;
+        const account = accounts[0] as { instagram_user_id: string; access_token_encrypted: string } | undefined;
+        if (!account?.access_token_encrypted) return result({ subscribed: false, reason: "No Instagram account is connected." });
+        const accessToken = decryptSecret(account.access_token_encrypted);
+        const version = process.env.META_GRAPH_API_VERSION || "v26.0";
+        const url = new URL(`https://graph.instagram.com/${version}/${account.instagram_user_id}/subscribed_apps`);
+        url.searchParams.set("subscribed_fields", "comments,messages,messaging_postbacks");
+        url.searchParams.set("access_token", accessToken);
+        const response = await fetch(url, { method: "POST", cache: "no-store" });
+        const data = await response.json() as { success?: boolean; error?: { message?: string } };
+        if (!response.ok || data.success === false) {
+          return result({ subscribed: false, providerError: data.error?.message ?? "Meta did not confirm webhook subscription." });
+        }
+        return result({ subscribed: true, fields: ["comments", "messages", "messaging_postbacks"], note: "Also configure the Instagram webhook callback URL and verify token in Meta Developer Dashboard." });
+      } catch {
+        return result({ subscribed: false, error: "Could not subscribe the Instagram account to webhooks." });
+      }
+    },
+  );
+
+  server.registerTool(
     "instagram_morning_data",
     {
       title: "Get Instagram morning briefing data",
