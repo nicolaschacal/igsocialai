@@ -3,6 +3,8 @@
 Tools are grouped by risk. Execution tools must validate account ownership, user permissions, policy scope, content version, and approval state server-side.
 
 ## Read / analyze (no external side effects)
+- instagram_workspace_status
+- instagram_morning_data
 - instagram_get_account
 - instagram_list_media
 - instagram_get_insights
