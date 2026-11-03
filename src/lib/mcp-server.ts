@@ -24,8 +24,8 @@ export const mcpHandler = createMcpHandler(() => {
     async () => {
       const configured = {
         database: Boolean(process.env.DATABASE_URL),
-        metaApp: Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET),
-        metaRedirect: Boolean(process.env.META_REDIRECT_URI),
+        metaApp: Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_CONFIG_ID),
+        metaRedirect: Boolean(process.env.META_REDIRECT_URI),\n        metaUnifiedLoginConfig: Boolean(process.env.META_CONFIG_ID),
         elevenLabs: Boolean(process.env.ELEVENLABS_API_KEY),
         encryptionKey: Boolean(process.env.APP_ENCRYPTION_KEY),
       };
@@ -72,7 +72,7 @@ export const mcpHandler = createMcpHandler(() => {
         if (!account?.access_token_encrypted) return result({ subscribed: false, reason: "No Instagram account is connected." });
         const accessToken = decryptSecret(account.access_token_encrypted);
         const version = process.env.META_GRAPH_API_VERSION || "v26.0";
-        const url = new URL(`https://graph.instagram.com/${version}/${account.instagram_user_id}/subscribed_apps`);
+        const url = new URL(`https://graph.facebook.com/${version}/${account.instagram_user_id}/subscribed_apps`);
         url.searchParams.set("subscribed_fields", "comments,messages,messaging_postbacks");
         url.searchParams.set("access_token", accessToken);
         const response = await fetch(url, { method: "POST", cache: "no-store" });
@@ -115,17 +115,17 @@ export const mcpHandler = createMcpHandler(() => {
 
         const accessToken = decryptSecret(account.access_token_encrypted);
         const version = process.env.META_GRAPH_API_VERSION || "v26.0";
-        const profileUrl = new URL(`https://graph.instagram.com/${version}/me`);
+        const profileUrl = new URL(`https://graph.facebook.com/${version}/${account.instagram_user_id}`);
         profileUrl.searchParams.set("fields", "user_id,username,account_type,media_count,followers_count,follows_count,biography,website,profile_picture_url");
         profileUrl.searchParams.set("access_token", accessToken);
 
-        const mediaUrl = new URL(`https://graph.instagram.com/${version}/me/media`);
+        const mediaUrl = new URL(`https://graph.facebook.com/${version}/${account.instagram_user_id}/media`)
         mediaUrl.searchParams.set("fields", "id,caption,media_type,media_product_type,media_url,permalink,timestamp,thumbnail_url,like_count,comments_count");
         mediaUrl.searchParams.set("limit", String(mediaLimit));
         mediaUrl.searchParams.set("access_token", accessToken);
 
         const now = Math.floor(Date.now() / 1000);
-        const accountInsightsUrl = new URL(`https://graph.instagram.com/${version}/${account.instagram_user_id}/insights`);
+        const accountInsightsUrl = new URL(`https://graph.facebook.com/${version}/${account.instagram_user_id}/insights`);
         accountInsightsUrl.searchParams.set("metric", "reach,views,accounts_engaged,total_interactions,likes,comments,saves,shares,follows_and_unfollows,profile_links_taps");
         accountInsightsUrl.searchParams.set("period", "day");
         accountInsightsUrl.searchParams.set("metric_type", "total_value");
@@ -160,7 +160,7 @@ export const mcpHandler = createMcpHandler(() => {
           const metrics = isReel
             ? "views,reach,likes,comments,saved,shares,total_interactions,ig_reels_avg_watch_time"
             : "reach,likes,comments,saved,shares,total_interactions";
-          const insightUrl = new URL(`https://graph.instagram.com/${version}/${mediaId}/insights`);
+          const insightUrl = new URL(`https://graph.facebook.com/${version}/${mediaId}/insights`);
           insightUrl.searchParams.set("metric", metrics);
           insightUrl.searchParams.set("metric_type", "total_value");
           insightUrl.searchParams.set("access_token", accessToken);
@@ -688,7 +688,7 @@ export const mcpHandler = createMcpHandler(() => {
         });
         if (cover) params.set("cover_url", signedUrl(String(cover.id)));
 
-        const createUrl = `https://graph.instagram.com/${version}/${account.instagram_user_id}/media`;
+        const createUrl = `https://graph.facebook.com/${version}/${account.instagram_user_id}/media`;
         const response = await fetch(createUrl, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -740,7 +740,7 @@ export const mcpHandler = createMcpHandler(() => {
         const accessToken = decryptSecret(account.access_token_encrypted);
         const version = process.env.META_GRAPH_API_VERSION || "v26.0";
 
-        const statusUrl = new URL(`https://graph.instagram.com/${version}/${approval.provider_container_id}`);
+        const statusUrl = new URL(`https://graph.facebook.com/${version}/${approval.provider_container_id}`);
         statusUrl.searchParams.set("fields", "status_code,status");
         statusUrl.searchParams.set("access_token", accessToken);
         const statusResponse = await fetch(statusUrl, { cache: "no-store" });
@@ -757,7 +757,7 @@ export const mcpHandler = createMcpHandler(() => {
           creation_id: approval.provider_container_id,
           access_token: accessToken,
         });
-        const publishResponse = await fetch(`https://graph.instagram.com/${version}/${account.instagram_user_id}/media_publish`, {
+        const publishResponse = await fetch(`https://graph.facebook.com/${version}/${account.instagram_user_id}/media_publish`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
           body: publishParams,
