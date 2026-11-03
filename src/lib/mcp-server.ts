@@ -25,7 +25,8 @@ export const mcpHandler = createMcpHandler(() => {
       const configured = {
         database: Boolean(process.env.DATABASE_URL),
         metaApp: Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_CONFIG_ID),
-        metaRedirect: Boolean(process.env.META_REDIRECT_URI),\n        metaUnifiedLoginConfig: Boolean(process.env.META_CONFIG_ID),
+        metaRedirect: Boolean(process.env.META_REDIRECT_URI),
+        metaUnifiedLoginConfig: Boolean(process.env.META_CONFIG_ID),
         elevenLabs: Boolean(process.env.ELEVENLABS_API_KEY),
         encryptionKey: Boolean(process.env.APP_ENCRYPTION_KEY),
       };
