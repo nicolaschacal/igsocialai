@@ -21,6 +21,7 @@ Tools are grouped by risk. Execution tools must validate account ownership, user
 - content_create_caption
 - content_create_cover_brief
 - media_generate_voiceover
+- elevenlabs_generate_voiceover
 - media_render_video
 - content_create_review_package
 
