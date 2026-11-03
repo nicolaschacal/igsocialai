@@ -32,8 +32,8 @@
 - [ ] Generate cover image and caption package
 
 ## M4 — Community automation
-- [ ] Subscribe to approved Meta webhooks
-- [ ] Keyword comment rules and one-private-reply flow
+- [x] Add signed Meta webhook endpoint and account subscription tool
+- [x] Add keyword comment matching, private reply and follow-gated resource delivery
 - [ ] Private reply flow where Meta permits
 - [ ] Inbox ingestion and response queue
 - [ ] Follow verification via `is_user_follow_business`, FAQ policies, human handoff, and audit log
