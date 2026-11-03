@@ -26,7 +26,7 @@ export async function POST(request: Request) {
         return parsed.protocol === "https:" || parsed.protocol === "claude:";
       } catch { return false; }
     });
-    if (!validUris) return NextResponse.json({ error: "invalid_redirect_uri", error_description: "Redirect URIs must use HTTPS or the Claude callback scheme." }, { status: 400; });
+    if (!validUris) return NextResponse.json({ error: "invalid_redirect_uri", error_description: "Redirect URIs must use HTTPS or the Claude callback scheme." }, { status: 400 });
 
     const grantTypes = body.grant_types ?? ["authorization_code", "refresh_token"];
     const responseTypes = body.response_types ?? ["code"];
