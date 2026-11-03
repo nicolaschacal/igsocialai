@@ -90,7 +90,7 @@ export async function POST(request: Request) {
   const destination = new URL(redirectUri);
   destination.searchParams.set("code", code);
   destination.searchParams.set("state", state);
-  const response = NextResponse.redirect(destination, 302);
+  const response = NextResponse.redirect(destination, { status: 302 });
   response.cookies.delete("mcp_oauth_nonce");
   return response;
 }
