@@ -1,6 +1,7 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { db, databaseUnavailableMessage } from "@/lib/db";
+import { decryptSecret } from "@/lib/crypto";
 
 function result(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -52,6 +53,78 @@ export const mcpHandler = createMcpHandler(() => {
         note: "Publishing and outbound messaging remain disabled until official Meta OAuth, permissions, webhook handling, and explicit approval checks are implemented.",
         nextStep: db ? "Connect your Instagram professional account." : databaseUnavailableMessage(),
       });
+    },
+  );
+
+  server.registerTool(
+    "instagram_morning_data",
+    {
+      title: "Get Instagram morning briefing data",
+      description: "Fetch the connected professional account profile and recent owned media so Claude can prepare the daily performance briefing. This reads data only.",
+      inputSchema: z.object({
+        mediaLimit: z.number().int().min(5).max(30).default(20),
+      }),
+    },
+    async ({ mediaLimit }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const accounts = await db`SELECT instagram_user_id, username, account_type, access_token_encrypted, token_expires_at, scopes FROM instagram_accounts ORDER BY connected_at DESC LIMIT 1`;
+        const account = accounts[0] as {
+          instagram_user_id: string;
+          username: string;
+          account_type: string | null;
+          access_token_encrypted: string;
+          token_expires_at: string | Date | null;
+          scopes: string[];
+        } | undefined;
+        if (!account?.access_token_encrypted) {
+          return result({ connected: false, message: "No Instagram professional account is connected yet. Start OAuth at /api/auth/instagram." });
+        }
+
+        const accessToken = decryptSecret(account.access_token_encrypted);
+        const version = process.env.META_GRAPH_API_VERSION || "v25.0";
+        const profileUrl = new URL(`https://graph.instagram.com/${version}/me`);
+        profileUrl.searchParams.set("fields", "user_id,username,account_type,media_count,followers_count,follows_count,biography,website,profile_picture_url");
+        profileUrl.searchParams.set("access_token", accessToken);
+
+        const mediaUrl = new URL(`https://graph.instagram.com/${version}/me/media`);
+        mediaUrl.searchParams.set("fields", "id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,like_count,comments_count");
+        mediaUrl.searchParams.set("limit", String(mediaLimit));
+        mediaUrl.searchParams.set("access_token", accessToken);
+
+        const [profileResponse, mediaResponse] = await Promise.all([
+          fetch(profileUrl, { cache: "no-store" }),
+          fetch(mediaUrl, { cache: "no-store" }),
+        ]);
+        const profileData = await profileResponse.json() as Record<string, unknown>;
+        const mediaData = await mediaResponse.json() as { data?: unknown[]; paging?: unknown; error?: unknown };
+        if (!profileResponse.ok || !mediaResponse.ok) {
+          return result({
+            connected: true,
+            account: { username: account.username, instagramUserId: account.instagram_user_id },
+            error: "Meta API request failed. Check token health and granted permissions.",
+            profileError: profileResponse.ok ? undefined : profileData,
+            mediaError: mediaResponse.ok ? undefined : mediaData.error,
+          });
+        }
+
+        return result({
+          connected: true,
+          account: {
+            username: account.username,
+            instagramUserId: account.instagram_user_id,
+            accountType: account.account_type,
+            tokenExpiresAt: account.token_expires_at,
+            grantedScopes: account.scopes,
+          },
+          profile: profileData,
+          recentMedia: mediaData.data ?? [],
+          fetchedAt: new Date().toISOString(),
+          analysisGuidance: "Distinguish observed metrics from interpretation. Do not infer reach, saves, shares, or audience demographics unless the API actually returned them.",
+        });
+      } catch {
+        return result({ error: "Could not retrieve Instagram data. Verify the encrypted token, APP_ENCRYPTION_KEY, and Meta API permissions." });
+      }
     },
   );
 
