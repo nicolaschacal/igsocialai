@@ -122,3 +122,8 @@ CREATE TABLE IF NOT EXISTS media_asset_blobs (
   content_base64 TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Track Meta publishing container state and idempotent publish results.
+ALTER TABLE approvals ADD COLUMN IF NOT EXISTS provider_container_id TEXT;
+ALTER TABLE approvals ADD COLUMN IF NOT EXISTS published_media_id TEXT;
+ALTER TABLE approvals ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
