@@ -16,6 +16,6 @@ Generated audio is stored as base64 in a separate Postgres table for the early s
 3. Copy `public/reel-props.example.json` to `public/reel-props.json` and edit the scenes.
 4. In Claude, generate the voiceover using `elevenlabs_generate_voiceover`.
 5. Copy the returned asset ID.
-6. Run `npm run render:reel -- ASSET_ID`.
+6. Run `npm run render:reel -- VOICEOVER_ASSET_ID CONTENT_ID`.
 
 The script downloads the audio from the protected app endpoint and runs Remotion locally, producing `out/reel.mp4`. The computer must have Node.js 22 and dependencies installed. This keeps video rendering off Vercel and avoids a paid cloud renderer.
