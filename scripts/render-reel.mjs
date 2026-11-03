@@ -59,7 +59,7 @@ if (render.status !== 0) {
 }
 
 const still = spawnSync("npx", [
-  "remotion", "still", "src/video/index.ts", "DailyReel", "out/cover.png",
+  "remotion", "still", "src/video/index.ts", "DailyReel", "out/cover.jpg",
   "--frame=0", `--props=${propsPath}`,
 ], { stdio: "inherit", shell: process.platform === "win32" });
 if (still.status !== 0) {
@@ -88,7 +88,7 @@ const metadata = {
   sceneCount: Array.isArray(props.scenes) ? props.scenes.length : 0,
 };
 const videoAsset = await storeAsset("video", "out/reel.mp4", "video/mp4", metadata);
-const coverAsset = await storeAsset("cover", "out/cover.png", "image/png", metadata);
+const coverAsset = await storeAsset("cover", "out/cover.jpg", "image/jpeg", metadata);
 
 console.log(JSON.stringify({
   rendered: true,
