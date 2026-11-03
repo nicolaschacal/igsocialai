@@ -373,6 +373,59 @@ export const mcpHandler = createMcpHandler(() => {
   );
 
   server.registerTool(
+    "media_render_queue",
+    {
+      title: "Queue a local Reel render",
+      description: "Queue a 9:16 Remotion render on the creator's own PC. A local worker polls Neon and renders the video and JPEG cover without a paid cloud renderer.",
+      inputSchema: z.object({
+        contentIdeaId: z.string().uuid(),
+        voiceoverAssetId: z.string().uuid(),
+      }),
+    },
+    async ({ contentIdeaId, voiceoverAssetId }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const ideas = await db`SELECT id, status, storyboard FROM content_ideas WHERE id = ${contentIdeaId} LIMIT 1`;
+        const idea = ideas[0] as { id: string; status: string; storyboard: unknown } | undefined;
+        if (!idea || !["selected", "in_production"].includes(idea.status)) {
+          return result({ queued: false, reason: "Select the content idea and save its storyboard before rendering." });
+        }
+        if (!idea.storyboard) return result({ queued: false, reason: "The content idea has no saved scene-by-scene storyboard." });
+        const voices = await db`SELECT id FROM media_assets WHERE id = ${voiceoverAssetId} AND asset_type = 'voiceover' AND content_idea_id = ${contentIdeaId} LIMIT 1`;
+        if (!voices.length) return result({ queued: false, reason: "Voiceover asset not found for this content idea. Generate it with contentIdeaId set to this idea." });
+
+        const rows = await db`INSERT INTO render_jobs (content_idea_id, voiceover_asset_id, status) VALUES (${contentIdeaId}, ${voiceoverAssetId}, 'queued') RETURNING id, status, created_at`;
+        return result({
+          queued: true,
+          job: rows[0],
+          note: "The render runs on the creator's PC. Start npm run worker:render in the igsocialai folder. The worker downloads the voiceover, builds scenes from the saved storyboard, renders the Reel and cover, and uploads both to Neon.",
+        });
+      } catch {
+        return result({ queued: false, error: "Could not queue the local render job." });
+      }
+    },
+  );
+
+  server.registerTool(
+    "media_render_status",
+    {
+      title: "Check local Reel render status",
+      description: "Check whether the creator's local worker has finished rendering a Reel and its cover.",
+      inputSchema: z.object({ jobId: z.string().uuid() }),
+    },
+    async ({ jobId }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const rows = await db`SELECT id, content_idea_id, status, video_asset_id, cover_asset_id, error_message, started_at, finished_at FROM render_jobs WHERE id = ${jobId} LIMIT 1`;
+        if (!rows.length) return result({ found: false });
+        return result({ found: true, job: rows[0] });
+      } catch {
+        return result({ error: "Could not read render job status." });
+      }
+    },
+  );
+
+  server.registerTool(
     "content_approval_request",
     {
       title: "Request approval to publish content",
