@@ -1,7 +1,7 @@
 # Integration status and constraints
 
 ## Claude / MCP
-The app exposes a remote Streamable HTTP MCP endpoint at `/api/mcp`. The initial endpoint uses a single bearer token from `MCP_ACCESS_TOKEN` for private development. This is not multi-user OAuth and must be replaced with per-user OAuth before selling the service.
+The app exposes a remote Streamable HTTP MCP endpoint at `/api/mcp` with OAuth 2.1 authorization-code + PKCE, dynamic client registration, refresh-token rotation, protected-resource metadata, and short-lived access tokens. The owner authorizes Claude by entering the private master key (`MCP_ACCESS_TOKEN`) on the app's consent page. The master key remains server-side and is also used by the local render worker. This is a single-owner authorization flow; multi-tenant customer identity and account isolation are still required before selling the service.
 
 ## Instagram
 The first integration path is **Instagram Login / Business Login**, intended for professional Creator and Business accounts without requiring a linked Facebook Page. OAuth starts at `/api/auth/instagram` and returns to `/api/auth/instagram/callback`.
