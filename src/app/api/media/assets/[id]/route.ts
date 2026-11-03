@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  if (!isAuthorizedMcpRequest(request)) {
+  if (!(await isAuthorizedMcpRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!db) return NextResponse.json({ error: "Database not configured" }, { status: 503 });
