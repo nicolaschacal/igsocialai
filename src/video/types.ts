@@ -4,6 +4,7 @@ export type ReelScene = {
   body?: string;
   emphasis?: string;
   layout?: "center" | "left" | "stat" | "quote" | "cta";
+  durationFrames?: number;
 };
 
 export type DailyReelProps = {
