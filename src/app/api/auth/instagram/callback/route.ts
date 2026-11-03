@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   if (!appId || !appSecret || !configId || !redirectUri || !db) {
     return redirectWithError(request, "instagram_integration_not_configured");
   }
-  if (!/^v\\d+\\.\\d+$/.test(graphVersion)) {
+  if (!/^v\d+\.\d+$/.test(graphVersion)) {
     return redirectWithError(request, "invalid_meta_api_version");
   }
 
