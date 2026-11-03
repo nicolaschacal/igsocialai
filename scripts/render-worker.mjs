@@ -22,8 +22,8 @@ async function processNextJob() {
         SELECT id FROM render_jobs
         WHERE status = 'queued'
         ORDER BY created_at ASC
-        FOR UPDATE SKIP LOCKED
         LIMIT 1
+        FOR UPDATE SKIP LOCKED
       )
       RETURNING id, content_idea_id, voiceover_asset_id, started_at`;
 
