@@ -26,6 +26,9 @@ Tools are grouped by risk. Execution tools must validate account ownership, user
 - content_create_review_package
 
 ## Approval workflow
+- content_idea_update
+- content_approval_request
+- content_approval_decide
 - approvals_list_pending
 - approvals_get_details
 - approvals_approve_version
