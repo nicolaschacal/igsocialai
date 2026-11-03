@@ -2,7 +2,7 @@
 
 **Your Instagram creator agent, operated from Claude.**
 
-The primary product experience is a conversation in Claude: morning account briefing, three content concepts, creator-approved production, and community operations. The web app is a small connection and settings surface — not a traditional social-media dashboard.
+The primary product experience is Claude Cowork: a 07:00 scheduled briefing, three content concepts, creator-approved production, and community operations. Cowork's scheduled task is the initial daily orchestrator; the app exposes remote MCP tools. The web app is a small connection and settings surface — not a traditional social-media dashboard.
 
 ## Current foundation
 
