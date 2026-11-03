@@ -75,7 +75,7 @@ For initial testing, add your own Instagram professional account as an app teste
 npm install
 Copy-Item public/reel-props.example.json public/reel-props.json
 npm run studio
-npm run render:reel -- YOUR_VOICEOVER_ASSET_ID
+npm run render:reel -- YOUR_VOICEOVER_ASSET_ID YOUR_CONTENT_ID
 ```
 
 The local render script downloads the generated audio from the protected app endpoint and renders `out/reel.mp4` using Remotion. See `docs/VIDEO-RENDERING.md` and `docs/ELEVENLABS.md`.
