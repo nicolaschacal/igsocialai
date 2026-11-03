@@ -355,8 +355,8 @@ export const mcpHandler = createMcpHandler(() => {
         const assets = await db`SELECT id, asset_type, storage_url, metadata FROM media_assets WHERE content_idea_id = ${ideaId} ORDER BY created_at ASC`;
         const hasVideo = assets.some((asset) => asset.asset_type === "video");
         const hasCover = assets.some((asset) => asset.asset_type === "cover");
-        if (action === "publish_reel" && !hasVideo) {
-          return result({ requested: false, reason: "A rendered video asset is required before requesting Reel approval." });
+        if (action === "publish_reel" && (!hasVideo || !hasCover)) {
+          return result({ requested: false, reason: "A rendered video and cover image are required before requesting Reel approval." });
         }
         if (!idea.caption) return result({ requested: false, reason: "A caption is required before requesting approval." });
 
