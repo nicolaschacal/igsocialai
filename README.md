@@ -74,12 +74,10 @@ For initial testing, add your own Instagram professional account as an app teste
 
 ```powershell
 npm install
-Copy-Item public/reel-props.example.json public/reel-props.json
-npm run studio
-npm run render:reel -- YOUR_VOICEOVER_ASSET_ID YOUR_CONTENT_ID
+npm run worker:render
 ```
 
-The local render script downloads the generated audio from the protected app endpoint and renders `out/reel.mp4` using Remotion. See `docs/VIDEO-RENDERING.md` and `docs/ELEVENLABS.md`.
+Keep the worker running (or start it at Windows login with Task Scheduler). Claude queues render jobs through MCP; the local worker renders `out/reel.mp4` and `out/cover.jpg` from the saved storyboard, then uploads both to Neon. See `docs/VIDEO-RENDERING.md` and `docs/ELEVENLABS.md`.
 
 ## Safety boundaries
 
