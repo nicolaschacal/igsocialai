@@ -77,7 +77,7 @@ export async function GET(request: Request) {
     if (!business.client_business_id) throw new Error("meta_business_portfolio_not_found");
 
     const assigned = await graphGet<{ data?: Array<{ id?: string; username?: string; account_type?: string }> }>(
-      "me/assigned_instagram_accounts?fields=id,username,account_type&limit=100",
+      "me/assigned_instagram_accounts?fields=id,username&limit=100",
       accessToken,
       graphVersion,
     );
