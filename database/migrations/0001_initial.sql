@@ -113,3 +113,12 @@ CREATE TABLE IF NOT EXISTS audit_log (
   details JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Binary media payloads are kept separate from asset metadata.
+CREATE TABLE IF NOT EXISTS media_asset_blobs (
+  asset_id UUID PRIMARY KEY REFERENCES media_assets(id) ON DELETE CASCADE,
+  mime_type TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  content_base64 TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
