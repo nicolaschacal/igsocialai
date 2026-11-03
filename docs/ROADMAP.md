@@ -33,10 +33,10 @@
 
 ## M4 — Community automation
 - [ ] Subscribe to approved Meta webhooks
-- [ ] Keyword comment rules
+- [ ] Keyword comment rules and one-private-reply flow
 - [ ] Private reply flow where Meta permits
 - [ ] Inbox ingestion and response queue
-- [ ] FAQ policies, human handoff, and audit log
+- [ ] Follow verification via `is_user_follow_business`, FAQ policies, human handoff, and audit log
 
 ## M5 — Daily operations
 - [ ] Durable retry queue for webhooks, Meta operations and media jobs (Claude Cowork handles the daily AI schedule)
