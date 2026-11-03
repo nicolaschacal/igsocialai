@@ -18,7 +18,7 @@ export async function GET() {
     );
   }
 
-  if (!/^v\\d+\\.\\d+$/.test(graphVersion)) {
+  if (!/^v\d+\.\d+$/.test(graphVersion)) {
     return NextResponse.json({ error: "META_GRAPH_API_VERSION must use the vX.Y format." }, { status: 503 });
   }
 
