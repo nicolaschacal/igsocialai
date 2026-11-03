@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "studio": "remotion studio src/video/index.ts",
+    "render:reel": "remotion render src/video/index.ts DailyReel out/reel.mp4 --props=public/reel-props.json"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -24,6 +26,8 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "remotion": "4.0.539",
+    "@remotion/cli": "4.0.539"
   }
 }
