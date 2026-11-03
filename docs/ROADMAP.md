@@ -36,7 +36,8 @@
 - [x] Add keyword comment matching, private reply and follow-gated resource delivery
 - [ ] Private reply flow where Meta permits
 - [ ] Inbox ingestion and response queue
-- [ ] Follow verification via `is_user_follow_business`, FAQ policies, human handoff, and audit log
+- [x] Follow verification via `is_user_follow_business` and resource delivery
+- [ ] General comment/DM triage, approved FAQ responses, and human handoff
 
 ## M5 — Daily operations
 - [ ] Durable retry queue for webhooks, Meta operations and media jobs (Claude Cowork handles the daily AI schedule)
