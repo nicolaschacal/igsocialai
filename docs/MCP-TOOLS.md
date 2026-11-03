@@ -6,6 +6,8 @@ Tools are grouped by risk. Execution tools must validate account ownership, user
 - instagram_workspace_status
 - instagram_morning_data
 - instagram_subscribe_webhooks
+- instagram_publish_approved
+- instagram_publish_finalize
 - instagram_get_account
 - instagram_list_media
 - instagram_get_insights
