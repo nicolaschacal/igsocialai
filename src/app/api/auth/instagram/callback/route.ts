@@ -11,6 +11,18 @@ function redirectWithError(request: Request, reason: string) {
   return response;
 }
 
+async function graphGet<T>(path: string, accessToken: string, graphVersion: string): Promise<T> {
+  const endpoint = new URL(`https://graph.facebook.com/${graphVersion}/${path}`);
+  endpoint.searchParams.set("access_token", accessToken);
+  const response = await fetch(endpoint, { cache: "no-store" });
+  const body = await response.json().catch(() => ({})) as { error?: { message?: string; code?: number } } & T;
+  if (!response.ok) {
+    const code = body.error?.code;
+    throw new Error(code ? `meta_graph_error_${code}` : "meta_graph_request_failed");
+  }
+  return body;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -28,9 +40,9 @@ export async function GET(request: Request) {
   const appId = process.env.META_APP_ID;
   const appSecret = process.env.META_APP_SECRET;
   const redirectUri = process.env.META_REDIRECT_URI;
-  const graphVersion = process.env.META_GRAPH_API_VERSION || "v25.0";
+  const graphVersion = process.env.META_GRAPH_API_VERSION || "v26.0";
 
-  if (!appId || !appSecret || !redirectUri || !db) {
+  if (!appId || !appSecret || !process.env.META_CONFIG_ID || !redirectUri || !db) {
     return redirectWithError(request, "instagram_integration_not_configured");
   }
   if (!/^v\d+\.\d+$/.test(graphVersion)) {
@@ -38,44 +50,43 @@ export async function GET(request: Request) {
   }
 
   try {
-    const shortTokenBody = new URLSearchParams({
-      client_id: appId,
-      client_secret: appSecret,
-      grant_type: "authorization_code",
-      redirect_uri: redirectUri,
-      code,
-    });
+    // Unified Login exchanges the authorization code through Graph API.
+    const tokenUrl = new URL(`https://graph.facebook.com/${graphVersion}/oauth/access_token`);
+    tokenUrl.searchParams.set("client_id", appId);
+    tokenUrl.searchParams.set("client_secret", appSecret);
+    tokenUrl.searchParams.set("redirect_uri", redirectUri);
+    tokenUrl.searchParams.set("code", code);
 
-    const shortTokenResponse = await fetch("https://api.instagram.com/oauth/access_token", {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: shortTokenBody,
-      cache: "no-store",
-    });
-    if (!shortTokenResponse.ok) throw new Error("short_token_exchange_failed");
-    const shortToken = await shortTokenResponse.json() as { access_token?: string; user_id?: string | number };
-    if (!shortToken.access_token) throw new Error("missing_short_token");
+    const tokenResponse = await fetch(tokenUrl, { cache: "no-store" });
+    const tokenBody = await tokenResponse.json() as {
+      access_token?: string;
+      token_type?: string;
+      expires_in?: number;
+      error?: { code?: number };
+    };
+    if (!tokenResponse.ok || !tokenBody.access_token) {
+      throw new Error(tokenBody.error?.code ? `meta_token_error_${tokenBody.error.code}` : "meta_token_exchange_failed");
+    }
 
-    const longTokenUrl = new URL("https://graph.instagram.com/access_token");
-    longTokenUrl.searchParams.set("grant_type", "ig_exchange_token");
-    longTokenUrl.searchParams.set("client_secret", appSecret);
-    longTokenUrl.searchParams.set("access_token", shortToken.access_token);
+    const accessToken = tokenBody.access_token;
+    const business = await graphGet<{ id?: string; client_business_id?: string }>(
+      "me?fields=id,client_business_id",
+      accessToken,
+      graphVersion,
+    );
+    if (!business.client_business_id) throw new Error("meta_business_portfolio_not_found");
 
-    const longTokenResponse = await fetch(longTokenUrl, { cache: "no-store" });
-    if (!longTokenResponse.ok) throw new Error("long_token_exchange_failed");
-    const longToken = await longTokenResponse.json() as { access_token?: string; token_type?: string; expires_in?: number };
-    if (!longToken.access_token) throw new Error("missing_long_token");
+    const assigned = await graphGet<{ data?: Array<{ id?: string; username?: string; account_type?: string }> }>(
+      "me/assigned_instagram_accounts?fields=id,username,account_type&limit=100",
+      accessToken,
+      graphVersion,
+    );
+    const accounts = (assigned.data ?? []).filter((account) => account.id && account.username);
+    if (accounts.length === 0) throw new Error("no_instagram_accounts_shared");
+    if (accounts.length > 1) throw new Error("multiple_instagram_accounts_shared");
 
-    const profileUrl = new URL(`https://graph.instagram.com/${graphVersion}/me`);
-    profileUrl.searchParams.set("fields", "user_id,username,account_type");
-    profileUrl.searchParams.set("access_token", longToken.access_token);
-
-    const profileResponse = await fetch(profileUrl, { cache: "no-store" });
-    if (!profileResponse.ok) throw new Error("instagram_profile_fetch_failed");
-    const profile = await profileResponse.json() as { user_id?: string | number; id?: string | number; username?: string; account_type?: string };
-    const instagramUserId = String(profile.user_id ?? profile.id ?? shortToken.user_id ?? "");
-    if (!instagramUserId || !profile.username) throw new Error("instagram_profile_incomplete");
-
+    const profile = accounts[0];
+    const instagramUserId = String(profile.id);
     const creatorRows = await db`SELECT id FROM creators ORDER BY created_at ASC LIMIT 1`;
     let creatorId = creatorRows[0]?.id as string | undefined;
     if (!creatorId) {
@@ -84,24 +95,27 @@ export async function GET(request: Request) {
     }
     if (!creatorId) throw new Error("creator_record_failed");
 
-    const encryptedToken = encryptSecret(longToken.access_token);
-    const expiresAt = new Date(Date.now() + Number(longToken.expires_in ?? 5_184_000) * 1000);
+    const encryptedToken = encryptSecret(accessToken);
+    const expiresAt = tokenBody.expires_in
+      ? new Date(Date.now() + tokenBody.expires_in * 1000).toISOString()
+      : null;
     const scopes = [
-      "instagram_business_basic",
-      "instagram_business_content_publish",
-      "instagram_business_manage_comments",
-      "instagram_business_manage_messages",
-      "instagram_business_manage_insights",
+      "instagram_basic",
+      "instagram_content_publish",
+      "instagram_manage_comments",
+      "instagram_manage_messages",
+      "instagram_manage_insights",
     ];
 
-    await db`INSERT INTO instagram_accounts (creator_id, instagram_user_id, username, account_type, access_token_encrypted, token_expires_at, scopes) VALUES (${creatorId}, ${instagramUserId}, ${profile.username}, ${profile.account_type ?? null}, ${encryptedToken}, ${expiresAt.toISOString()}, ${scopes}) ON CONFLICT (instagram_user_id) DO UPDATE SET creator_id = EXCLUDED.creator_id, username = EXCLUDED.username, account_type = EXCLUDED.account_type, access_token_encrypted = EXCLUDED.access_token_encrypted, token_expires_at = EXCLUDED.token_expires_at, scopes = EXCLUDED.scopes, updated_at = NOW()`;
+    await db`INSERT INTO instagram_accounts (creator_id, instagram_user_id, username, account_type, access_token_encrypted, token_expires_at, scopes) VALUES (${creatorId}, ${instagramUserId}, ${profile.username}, ${profile.account_type ?? null}, ${encryptedToken}, ${expiresAt}, ${scopes}) ON CONFLICT (instagram_user_id) DO UPDATE SET creator_id = EXCLUDED.creator_id, username = EXCLUDED.username, account_type = EXCLUDED.account_type, access_token_encrypted = EXCLUDED.access_token_encrypted, token_expires_at = EXCLUDED.token_expires_at, scopes = EXCLUDED.scopes, updated_at = NOW()`;
 
-    await db`INSERT INTO audit_log (creator_id, actor, action, target_type, target_id, details) VALUES (${creatorId}, 'system', 'instagram_account_connected', 'instagram_account', ${instagramUserId}, ${JSON.stringify({ username: profile.username, account_type: profile.account_type ?? null })}::jsonb)`;
+    await db`INSERT INTO audit_log (creator_id, actor, action, target_type, target_id, details) VALUES (${creatorId}, 'system', 'instagram_account_connected', 'instagram_account', ${instagramUserId}, ${JSON.stringify({ username: profile.username, auth_method: "unified_login", client_business_id: business.client_business_id })}::jsonb)`;
 
     const response = NextResponse.redirect(new URL("/?instagram=connected", request.url));
     response.cookies.delete("ig_oauth_state");
     return response;
-  } catch {
-    return redirectWithError(request, "instagram_connection_failed");
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "instagram_connection_failed";
+    return redirectWithError(request, reason.startsWith("meta_") || reason.endsWith("_shared") ? reason : "instagram_connection_failed");
   }
 }
