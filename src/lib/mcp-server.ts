@@ -2,7 +2,7 @@ import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import { createHash } from "node:crypto";
 import * as z from "zod/v4";
 import { db, databaseUnavailableMessage } from "@/lib/db";
-import { decryptSecret } from "@/lib/crypto";
+import { decryptSecret, signPublicMediaUrl } from "@/lib/crypto";
 
 function result(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -360,9 +360,17 @@ export const mcpHandler = createMcpHandler(() => {
         }
         if (!idea.caption) return result({ requested: false, reason: "A caption is required before requesting approval." });
 
+        const ideaSnapshot = {
+          id: idea.id, format: idea.format, title: idea.title, hook: idea.hook,
+          summary: idea.summary, script: idea.script, storyboard: idea.storyboard,
+          caption: idea.caption, cta: idea.cta, keyword: idea.keyword,
+        };
+        const assetSnapshot = assets.map((asset) => ({
+          id: asset.id, type: asset.asset_type, storageUrl: asset.storage_url, metadata: asset.metadata,
+        }));
         const contentHash = createHash("sha256").update(JSON.stringify({
-          idea,
-          assets: assets.map((asset) => ({ id: asset.id, type: asset.asset_type, storageUrl: asset.storage_url, metadata: asset.metadata })),
+          idea: ideaSnapshot,
+          assets: assetSnapshot,
         })).digest("hex");
         await db`UPDATE content_ideas SET status = 'ready_for_review', updated_at = NOW() WHERE id = ${ideaId}`;
         const approvals = await db`INSERT INTO approvals (content_idea_id, action, content_hash, status) VALUES (${ideaId}, ${action}, ${contentHash}, 'pending') RETURNING id, action, status, created_at`;
@@ -407,6 +415,165 @@ export const mcpHandler = createMcpHandler(() => {
         });
       } catch {
         return result({ recorded: false, error: "Could not record the approval decision." });
+      }
+    },
+  );
+
+  server.registerTool(
+    "instagram_publish_approved",
+    {
+      title: "Prepare approved Instagram Reel for publishing",
+      description: "Create an Instagram Reel media container only when a creator-approved approval record exists and its content hash still matches the exact saved script, caption, video and cover assets. This prepares the publish job but does not finalize the post.",
+      inputSchema: z.object({ approvalId: z.string().uuid() }),
+    },
+    async ({ approvalId }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const rows = await db`SELECT a.id, a.content_idea_id, a.action, a.status, a.content_hash, a.provider_container_id, a.published_media_id,
+          i.format, i.title, i.hook, i.summary, i.script, i.storyboard, i.caption, i.cta, i.keyword
+          FROM approvals a JOIN content_ideas i ON i.id = a.content_idea_id WHERE a.id = ${approvalId} LIMIT 1`;
+        const approval = rows[0] as Record<string, unknown> | undefined;
+        if (!approval) return result({ prepared: false, reason: "Approval request not found." });
+        if (approval.status !== "approved") return result({ prepared: false, reason: "Creator approval is required before publishing." });
+        if (approval.published_media_id) return result({ prepared: false, alreadyPublished: true, instagramMediaId: approval.published_media_id });
+        if (approval.action !== "publish_reel") return result({ prepared: false, reason: "Only Reel publishing is implemented in this milestone." });
+        if (!approval.caption) return result({ prepared: false, reason: "Approved caption is missing." });
+
+        const assets = await db`SELECT id, asset_type, storage_url, metadata FROM media_assets WHERE content_idea_id = ${approval.content_idea_id} ORDER BY created_at ASC`;
+        const video = assets.find((asset) => asset.asset_type === "video");
+        const cover = assets.find((asset) => asset.asset_type === "cover");
+        if (!video) return result({ prepared: false, reason: "Rendered Reel video asset is missing." });
+
+        const ideaSnapshot = {
+          id: approval.content_idea_id, format: approval.format, title: approval.title, hook: approval.hook,
+          summary: approval.summary, script: approval.script, storyboard: approval.storyboard,
+          caption: approval.caption, cta: approval.cta, keyword: approval.keyword,
+        };
+        const assetSnapshot = assets.map((asset) => ({
+          id: asset.id, type: asset.asset_type, storageUrl: asset.storage_url, metadata: asset.metadata,
+        }));
+        const currentHash = createHash("sha256").update(JSON.stringify({
+          idea: ideaSnapshot,
+          assets: assetSnapshot,
+        })).digest("hex");
+        if (currentHash !== approval.content_hash) {
+          return result({ prepared: false, reason: "Content changed after approval. Generate a new approval for the latest version." });
+        }
+
+        if (approval.provider_container_id) {
+          return result({ prepared: true, existingContainer: true, containerId: approval.provider_container_id, nextStep: "Call instagram_publish_finalize to check processing and publish when ready." });
+        }
+
+        const accounts = await db`SELECT instagram_user_id, access_token_encrypted FROM instagram_accounts ORDER BY connected_at DESC LIMIT 1`;
+        const account = accounts[0] as { instagram_user_id: string; access_token_encrypted: string } | undefined;
+        if (!account?.access_token_encrypted) return result({ prepared: false, reason: "No Instagram account is connected." });
+
+        const accessToken = decryptSecret(account.access_token_encrypted);
+        const version = process.env.META_GRAPH_API_VERSION || "v26.0";
+        const baseUrlRaw = process.env.NEXT_PUBLIC_APP_URL || "";
+        const baseUrl = baseUrlRaw.endsWith("/") ? baseUrlRaw.slice(0, -1) : baseUrlRaw;
+        if (!baseUrl) return result({ prepared: false, reason: "NEXT_PUBLIC_APP_URL is not configured." });
+        const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60;
+        const signedUrl = (assetId: string) => {
+          const signature = signPublicMediaUrl(assetId, expiresAt);
+          return `${baseUrl}/api/media/public/${assetId}?expires=${expiresAt}&sig=${signature}`;
+        };
+
+        const params = new URLSearchParams({
+          media_type: "REELS",
+          video_url: signedUrl(String(video.id)),
+          caption: String(approval.caption),
+          share_to_feed: "true",
+          access_token: accessToken,
+        });
+        if (cover) params.set("cover_url", signedUrl(String(cover.id)));
+
+        const createUrl = `https://graph.instagram.com/${version}/${account.instagram_user_id}/media`;
+        const response = await fetch(createUrl, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: params,
+          cache: "no-store",
+        });
+        const data = await response.json() as { id?: string; error?: { message?: string; code?: number } };
+        if (!response.ok || !data.id) {
+          return result({ prepared: false, providerError: data.error?.message ?? "Meta could not create a Reel container.", providerCode: data.error?.code });
+        }
+
+        await db`UPDATE approvals SET provider_container_id = ${data.id} WHERE id = ${approvalId} AND status = 'approved'`;
+        return result({
+          prepared: true,
+          containerId: data.id,
+          videoAssetId: video.id,
+          coverAssetId: cover?.id ?? null,
+          nextStep: "Call instagram_publish_finalize. It will publish only after Meta reports the container as FINISHED.",
+        });
+      } catch {
+        return result({ prepared: false, error: "Could not prepare the approved Reel. Verify Meta permissions, token health, signed media URLs, and content hash." });
+      }
+    },
+  );
+
+  server.registerTool(
+    "instagram_publish_finalize",
+    {
+      title: "Finalize approved Instagram Reel publication",
+      description: "Check the Meta media container and publish it only when Meta reports FINISHED. The operation is idempotent and records the resulting Instagram media ID.",
+      inputSchema: z.object({ approvalId: z.string().uuid() }),
+    },
+    async ({ approvalId }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const rows = await db`SELECT a.id, a.content_idea_id, a.action, a.status, a.provider_container_id, a.published_media_id,
+          i.title FROM approvals a JOIN content_ideas i ON i.id = a.content_idea_id WHERE a.id = ${approvalId} LIMIT 1`;
+        const approval = rows[0] as { id: string; content_idea_id: string; action: string; status: string; provider_container_id: string | null; published_media_id: string | null; title: string } | undefined;
+        if (!approval) return result({ published: false, reason: "Approval request not found." });
+        if (approval.status !== "approved") return result({ published: false, reason: "Creator approval is required." });
+        if (approval.published_media_id) return result({ published: true, alreadyPublished: true, instagramMediaId: approval.published_media_id });
+        if (approval.action !== "publish_reel" || !approval.provider_container_id) {
+          return result({ published: false, reason: "No approved Reel container is ready. Call instagram_publish_approved first." });
+        }
+
+        const accounts = await db`SELECT instagram_user_id, access_token_encrypted FROM instagram_accounts ORDER BY connected_at DESC LIMIT 1`;
+        const account = accounts[0] as { instagram_user_id: string; access_token_encrypted: string } | undefined;
+        if (!account?.access_token_encrypted) return result({ published: false, reason: "No Instagram account is connected." });
+        const accessToken = decryptSecret(account.access_token_encrypted);
+        const version = process.env.META_GRAPH_API_VERSION || "v26.0";
+
+        const statusUrl = new URL(`https://graph.instagram.com/${version}/${approval.provider_container_id}`);
+        statusUrl.searchParams.set("fields", "status_code,status");
+        statusUrl.searchParams.set("access_token", accessToken);
+        const statusResponse = await fetch(statusUrl, { cache: "no-store" });
+        const statusData = await statusResponse.json() as { status_code?: string; status?: string; error?: { message?: string } };
+        if (!statusResponse.ok) return result({ published: false, error: statusData.error?.message ?? "Could not read Meta container status." });
+        if (statusData.status_code === "ERROR" || statusData.status_code === "EXPIRED") {
+          return result({ published: false, containerStatus: statusData.status_code, detail: statusData.status });
+        }
+        if (statusData.status_code !== "FINISHED") {
+          return result({ published: false, ready: false, containerStatus: statusData.status_code ?? "UNKNOWN", detail: statusData.status, nextStep: "Call instagram_publish_finalize again after Meta finishes processing the video." });
+        }
+
+        const publishParams = new URLSearchParams({
+          creation_id: approval.provider_container_id,
+          access_token: accessToken,
+        });
+        const publishResponse = await fetch(`https://graph.instagram.com/${version}/${account.instagram_user_id}/media_publish`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: publishParams,
+          cache: "no-store",
+        });
+        const publishedData = await publishResponse.json() as { id?: string; error?: { message?: string } };
+        if (!publishResponse.ok || !publishedData.id) {
+          return result({ published: false, providerError: publishedData.error?.message ?? "Meta did not confirm publication." });
+        }
+
+        await db`UPDATE approvals SET published_media_id = ${publishedData.id}, published_at = NOW() WHERE id = ${approvalId} AND published_media_id IS NULL`;
+        await db`UPDATE content_ideas SET status = 'published', updated_at = NOW() WHERE id = ${approval.content_idea_id}`;
+        await db`INSERT INTO audit_log (actor, action, target_type, target_id, details) VALUES ('system', 'instagram_reel_published', 'instagram_media', ${publishedData.id}, ${JSON.stringify({ approvalId, contentIdeaId: approval.content_idea_id, title: approval.title })}::jsonb)`;
+        return result({ published: true, instagramMediaId: publishedData.id, title: approval.title, approvalId });
+      } catch {
+        return result({ published: false, error: "Could not finalize Instagram publication. Verify token, permissions, container state, and audit storage." });
       }
     },
   );
