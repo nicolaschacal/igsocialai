@@ -1,0 +1,38 @@
+{
+  "title": "La nube no es una nube",
+  "handle": "@nickdhq",
+  "accentColor": "#9b8cff",
+  "backgroundColor": "#10131b",
+  "audioSrc": "voiceover.mp3",
+  "durationInFrames": 1050,
+  "scenes": [
+    {
+      "kicker": "LA IDEA",
+      "headline": "La nube no es una nube",
+      "body": "Tu información sigue dependiendo de infraestructura física."
+    },
+    {
+      "kicker": "REALIDAD",
+      "layout": "left",
+      "headline": "Miles de kilómetros de fibra óptica",
+      "body": "Cables submarinos, centros de datos y redes eléctricas sostienen cada respuesta."
+    },
+    {
+      "layout": "stat",
+      "emphasis": "99%",
+      "headline": "de la información viaja por cables",
+      "body": "La nube tiene una dirección física."
+    },
+    {
+      "kicker": "EN RESUMEN",
+      "headline": "La IA parece magia. La infraestructura no.",
+      "body": "Y esa dependencia importa más de lo que creemos."
+    },
+    {
+      "layout": "cta",
+      "kicker": "¿QUERÉS LA GUÍA?",
+      "headline": "Comentá INFRA y te la mando por DM",
+      "body": "Seguime para más tecnología explicada sin vueltas."
+    }
+  ]
+}
