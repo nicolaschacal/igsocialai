@@ -51,3 +51,17 @@ export function randomOAuthState() {
   const payload = `${randomBytes(24).toString("base64url")}.${Date.now()}`;
   return signOAuthState(payload);
 }
+
+export function signPublicMediaUrl(assetId: string, expiresAt: number) {
+  const payload = `${assetId}.${expiresAt}`;
+  return createHmac("sha256", encryptionKey()).update(payload).digest("base64url");
+}
+
+export function verifyPublicMediaUrl(assetId: string, expiresAt: number, signature: string) {
+  if (!Number.isFinite(expiresAt)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  if (expiresAt < now || expiresAt > now + 60 * 60) return false;
+  const expected = Buffer.from(signPublicMediaUrl(assetId, expiresAt));
+  const supplied = Buffer.from(signature);
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
+}
