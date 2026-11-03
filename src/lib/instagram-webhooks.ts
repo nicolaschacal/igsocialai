@@ -131,7 +131,7 @@ async function processInboundMessage(event: Record<string, unknown>) {
   const claim = await claimWebhookEvent(eventId, "instagram_message", event);
   if (claim.alreadyProcessed) return;
 
-  let stateRows;
+  let stateRows: Array<{ automation_rule_id: string; status: string; resource_url: string | null; requires_follow: boolean; enabled: boolean }> = [];
   if (explicitRuleId && /^[0-9a-f-]{36}$/i.test(explicitRuleId)) {
     stateRows = await db`SELECT s.automation_rule_id, s.status, r.resource_url, r.requires_follow, r.enabled FROM automation_contact_states s JOIN automation_rules r ON r.id = s.automation_rule_id WHERE s.automation_rule_id = ${explicitRuleId} AND s.contact_igsid = ${senderId} LIMIT 1`;
   } else if (isFollowConfirmation) {
@@ -144,11 +144,11 @@ async function processInboundMessage(event: Record<string, unknown>) {
   const state = stateRows?.[0] as {
     automation_rule_id: string;
     status: string;
-    resource_url: string;
+    resource_url: string | null;
     requires_follow: boolean;
     enabled: boolean;
   } | undefined;
-  if (!state || !state.enabled || state.status === "delivered") {
+  if (!state || !state.enabled || state.status === "delivered" || !state.resource_url) {
     await markWebhookProcessed(eventId);
     return;
   }
