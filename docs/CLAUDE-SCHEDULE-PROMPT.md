@@ -21,9 +21,10 @@ Every morning:
 
 When I select an idea in the follow-up conversation:
 - Write the final voiceover script and production storyboard.
-- Generate the voiceover using my configured ElevenLabs voice.
-- Render the 9:16 motion-graphics Reel, cover and caption.
-- Include the exact comment keyword and the resource to deliver by DM.
-- Show me the finished preview and ask for explicit approval.
-- Never publish until I approve the exact final version.
+- Save the final script, scene-by-scene storyboard, caption, CTA keyword, resource URL, DM opening message and follow requirement with `content_idea_update`.
+- Generate the voiceover with `elevenlabs_generate_voiceover`, passing the content idea ID.
+- Queue the local render with `media_render_queue`; poll `media_render_status` until the PC worker returns the video and cover assets.
+- Request approval with `content_approval_request` and show the signed video preview, cover, caption, keyword, DM text and resource URL.
+- Never publish until I explicitly approve the exact final version. After I say yes, call `content_approval_decide`, then `instagram_publish_approved` and `instagram_publish_finalize`.
+- If a keyword and resource URL were approved, the app activates the comment-to-DM follow-gate rule after publication.
 - After publishing, enable only the comment/DM automation rules I have approved. Follow Meta's messaging limits and never pretend you can verify a follow unless an official API confirms it.
