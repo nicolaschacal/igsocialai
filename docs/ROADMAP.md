@@ -26,8 +26,8 @@
 ## M3 — Media production
 - [x] Define a versioned scene-manifest shape for the first Remotion template
 - [x] Build first local 9:16 Remotion motion-graphics template
-- [ ] Add ElevenLabs voice provider adapter
-- [ ] Render preview and store media assets
+- [x] Add ElevenLabs voice provider adapter and private Neon audio asset storage
+- [x] Add local Remotion render runner and protected audio download route
 - [ ] Generate cover image and caption package
 
 ## M4 — Community automation
