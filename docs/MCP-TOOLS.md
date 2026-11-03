@@ -23,6 +23,8 @@ Tools are grouped by risk. Execution tools must validate account ownership, user
 - content_create_storyboard
 - content_create_caption
 - content_create_cover_brief
+- media_render_queue
+- media_render_status
 - media_generate_voiceover
 - elevenlabs_generate_voiceover
 - media_render_video
