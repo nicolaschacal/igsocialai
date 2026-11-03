@@ -56,9 +56,10 @@ Add a custom remote MCP connector in Claude:
 
 - Name: `IG Social AI`
 - Server URL: `https://igsocialai.vercel.app/api/mcp`
-- Authentication: request header `Authorization: Bearer YOUR_MCP_ACCESS_TOKEN`
+- Click Connect and complete the OAuth authorization page.
+- Enter the IG Social AI master key (`MCP_ACCESS_TOKEN`) in the authorization page. Claude receives a separate short-lived OAuth token; the master key is not stored in Claude.
 
-Claude supports fixed request headers for remote MCP servers. After connecting, enable the connector in Cowork and create the daily scheduled task using `docs/CLAUDE-SCHEDULE-PROMPT.md`.
+After connecting, enable the connector in Cowork and create the daily scheduled task using `docs/CLAUDE-SCHEDULE-PROMPT.md`.
 
 ## Connect Instagram
 
