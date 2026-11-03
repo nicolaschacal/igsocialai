@@ -35,6 +35,7 @@ Set these in Vercel → Project → Settings → Environment Variables, and in `
 - `META_APP_SECRET`: matching Instagram App Secret.
 - `META_REDIRECT_URI`: exactly `https://igsocialai.vercel.app/api/auth/instagram/callback`.
 - `META_GRAPH_API_VERSION`: `v26.0`.
+- `META_VERIFY_TOKEN`: random webhook verification token; also enter the same value in Meta's webhook configuration.
 - `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`: required for voice generation.
 - `NEXT_PUBLIC_APP_URL`: `https://igsocialai.vercel.app`.
 - `IGSOCIALAI_URL`: same URL, used by the local renderer.
