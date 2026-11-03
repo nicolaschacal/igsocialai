@@ -51,7 +51,7 @@ const SceneCard: React.FC<{
         {isStat && <div style={{ color: accentColor, fontSize: 190, lineHeight: 1, fontWeight: 900, letterSpacing: -12 }}>{scene.emphasis}</div>}
         <div style={{
           color: "white", fontSize: isCta ? 78 : 84, fontWeight: 900, lineHeight: 1.02,
-          letterSpacing: -4, textWrap: "balance" as const,
+          letterSpacing: -4,
         }}>{scene.headline}</div>
         {scene.body && <div style={{
           color: "#d6d9e5", fontSize: 34, lineHeight: 1.35, marginTop: 30,
