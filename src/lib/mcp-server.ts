@@ -533,8 +533,8 @@ export const mcpHandler = createMcpHandler(() => {
       if (!db) return result({ error: databaseUnavailableMessage() });
       try {
         const rows = await db`SELECT a.id, a.content_idea_id, a.action, a.status, a.provider_container_id, a.published_media_id,
-          i.title FROM approvals a JOIN content_ideas i ON i.id = a.content_idea_id WHERE a.id = ${approvalId} LIMIT 1`;
-        const approval = rows[0] as { id: string; content_idea_id: string; action: string; status: string; provider_container_id: string | null; published_media_id: string | null; title: string } | undefined;
+          i.title, i.keyword, i.resource_url, i.dm_message, i.requires_follow FROM approvals a JOIN content_ideas i ON i.id = a.content_idea_id WHERE a.id = ${approvalId} LIMIT 1`;
+        const approval = rows[0] as { id: string; content_idea_id: string; action: string; status: string; provider_container_id: string | null; published_media_id: string | null; title: string; keyword: string | null; resource_url: string | null; dm_message: string | null; requires_follow: boolean } | undefined;
         if (!approval) return result({ published: false, reason: "Approval request not found." });
         if (approval.status !== "approved") return result({ published: false, reason: "Creator approval is required." });
         if (approval.published_media_id) return result({ published: true, alreadyPublished: true, instagramMediaId: approval.published_media_id });
@@ -578,8 +578,18 @@ export const mcpHandler = createMcpHandler(() => {
 
         await db`UPDATE approvals SET published_media_id = ${publishedData.id}, published_at = NOW() WHERE id = ${approvalId} AND published_media_id IS NULL`;
         await db`UPDATE content_ideas SET status = 'published', updated_at = NOW() WHERE id = ${approval.content_idea_id}`;
+        let automationRuleId: string | null = null;
+        if (approval.keyword && approval.resource_url) {
+          const rules = await db`INSERT INTO automation_rules (creator_id, content_idea_id, instagram_media_id, rule_type, keyword, response_template, resource_url, requires_follow, enabled)
+            SELECT creator_id, ${approval.content_idea_id}, ${publishedData.id}, 'comment_keyword', ${approval.keyword},
+              ${approval.dm_message ?? "¡Gracias por comentar! Para recibir el recurso, seguime y tocá «Ya seguí»."},
+              ${approval.resource_url}, ${approval.requires_follow}, TRUE
+            FROM instagram_accounts WHERE instagram_user_id = ${account.instagram_user_id}
+            RETURNING id`;
+          automationRuleId = rules[0]?.id ? String(rules[0].id) : null;
+        }
         await db`INSERT INTO audit_log (actor, action, target_type, target_id, details) VALUES ('system', 'instagram_reel_published', 'instagram_media', ${publishedData.id}, ${JSON.stringify({ approvalId, contentIdeaId: approval.content_idea_id, title: approval.title })}::jsonb)`;
-        return result({ published: true, instagramMediaId: publishedData.id, title: approval.title, approvalId });
+        return result({ published: true, instagramMediaId: publishedData.id, title: approval.title, approvalId, commentAutomationRuleId: automationRuleId, commentAutomationEnabled: Boolean(automationRuleId) });
       } catch {
         return result({ published: false, error: "Could not finalize Instagram publication. Verify token, permissions, container state, and audit storage." });
       }
