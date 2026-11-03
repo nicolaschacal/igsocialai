@@ -91,7 +91,7 @@ export const mcpHandler = createMcpHandler(() => {
     "instagram_morning_data",
     {
       title: "Get Instagram morning briefing data",
-      description: "Fetch the connected professional account profile and recent owned media so Claude can prepare the daily performance briefing. This reads data only.",
+      description: "Fetch the connected professional account profile, account insights, recent media and per-post insights so Claude can prepare the daily performance briefing. This reads data only.",
       inputSchema: z.object({
         mediaLimit: z.number().int().min(5).max(30).default(20),
       }),
@@ -99,8 +99,9 @@ export const mcpHandler = createMcpHandler(() => {
     async ({ mediaLimit }) => {
       if (!db) return result({ error: databaseUnavailableMessage() });
       try {
-        const accounts = await db`SELECT instagram_user_id, username, account_type, access_token_encrypted, token_expires_at, scopes FROM instagram_accounts ORDER BY connected_at DESC LIMIT 1`;
+        const accounts = await db`SELECT creator_id, instagram_user_id, username, account_type, access_token_encrypted, token_expires_at, scopes FROM instagram_accounts ORDER BY connected_at DESC LIMIT 1`;
         const account = accounts[0] as {
+          creator_id: string | null;
           instagram_user_id: string;
           username: string;
           account_type: string | null;
@@ -119,24 +120,67 @@ export const mcpHandler = createMcpHandler(() => {
         profileUrl.searchParams.set("access_token", accessToken);
 
         const mediaUrl = new URL(`https://graph.instagram.com/${version}/me/media`);
-        mediaUrl.searchParams.set("fields", "id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,like_count,comments_count");
+        mediaUrl.searchParams.set("fields", "id,caption,media_type,media_product_type,media_url,permalink,timestamp,thumbnail_url,like_count,comments_count");
         mediaUrl.searchParams.set("limit", String(mediaLimit));
         mediaUrl.searchParams.set("access_token", accessToken);
 
-        const [profileResponse, mediaResponse] = await Promise.all([
+        const now = Math.floor(Date.now() / 1000);
+        const accountInsightsUrl = new URL(`https://graph.instagram.com/${version}/${account.instagram_user_id}/insights`);
+        accountInsightsUrl.searchParams.set("metric", "reach,views,accounts_engaged,total_interactions,likes,comments,saves,shares,follows_and_unfollows,profile_links_taps");
+        accountInsightsUrl.searchParams.set("period", "day");
+        accountInsightsUrl.searchParams.set("metric_type", "total_value");
+        accountInsightsUrl.searchParams.set("since", String(now - 7 * 24 * 60 * 60));
+        accountInsightsUrl.searchParams.set("until", String(now));
+        accountInsightsUrl.searchParams.set("access_token", accessToken);
+
+        const [profileResponse, mediaResponse, accountInsightsResponse] = await Promise.all([
           fetch(profileUrl, { cache: "no-store" }),
           fetch(mediaUrl, { cache: "no-store" }),
+          fetch(accountInsightsUrl, { cache: "no-store" }),
         ]);
         const profileData = await profileResponse.json() as Record<string, unknown>;
-        const mediaData = await mediaResponse.json() as { data?: unknown[]; paging?: unknown; error?: unknown };
+        const mediaData = await mediaResponse.json() as { data?: Array<Record<string, unknown>>; paging?: unknown; error?: unknown };
+        const accountInsightsData = await accountInsightsResponse.json() as { data?: unknown[]; error?: unknown };
+
         if (!profileResponse.ok || !mediaResponse.ok) {
           return result({
             connected: true,
             account: { username: account.username, instagramUserId: account.instagram_user_id },
-            error: "Meta API request failed. Check token health and granted permissions.",
+            error: "Meta profile or media request failed. Check token health and granted permissions.",
             profileError: profileResponse.ok ? undefined : profileData,
             mediaError: mediaResponse.ok ? undefined : mediaData.error,
           });
+        }
+
+        const recentMedia = mediaData.data ?? [];
+        const mediaInsights = await Promise.all(recentMedia.slice(0, 10).map(async (media) => {
+          const mediaId = String(media.id ?? "");
+          if (!mediaId) return { mediaId: null, insights: [], error: "Missing media ID" };
+          const isReel = media.media_product_type === "REELS" || media.media_type === "VIDEO";
+          const metrics = isReel
+            ? "views,reach,likes,comments,saved,shares,total_interactions,ig_reels_avg_watch_time"
+            : "reach,likes,comments,saved,shares,total_interactions";
+          const insightUrl = new URL(`https://graph.instagram.com/${version}/${mediaId}/insights`);
+          insightUrl.searchParams.set("metric", metrics);
+          insightUrl.searchParams.set("metric_type", "total_value");
+          insightUrl.searchParams.set("access_token", accessToken);
+          try {
+            const response = await fetch(insightUrl, { cache: "no-store" });
+            const data = await response.json() as { data?: unknown[]; error?: { message?: string } };
+            return {
+              mediaId,
+              mediaProductType: media.media_product_type ?? media.media_type,
+              insights: response.ok ? data.data ?? [] : [],
+              error: response.ok ? undefined : data.error?.message ?? "Media insights unavailable",
+            };
+          } catch {
+            return { mediaId, mediaProductType: media.media_product_type ?? media.media_type, insights: [], error: "Media insights request failed" };
+          }
+        }));
+
+        let historicalReports: unknown[] = [];
+        if (account.creator_id) {
+          historicalReports = await db`SELECT report_date, account_snapshot, niche_snapshot, recommendations FROM daily_reports WHERE creator_id = ${account.creator_id} ORDER BY report_date DESC LIMIT 7`;
         }
 
         return result({
@@ -149,9 +193,13 @@ export const mcpHandler = createMcpHandler(() => {
             grantedScopes: account.scopes,
           },
           profile: profileData,
-          recentMedia: mediaData.data ?? [],
+          accountInsights: accountInsightsResponse.ok ? accountInsightsData.data ?? [] : [],
+          accountInsightsError: accountInsightsResponse.ok ? undefined : accountInsightsData.error,
+          recentMedia,
+          mediaInsights,
+          historicalReports,
           fetchedAt: new Date().toISOString(),
-          analysisGuidance: "Distinguish observed metrics from interpretation. Do not infer reach, saves, shares, or audience demographics unless the API actually returned them.",
+          analysisGuidance: "Separate measured metrics from interpretation. Meta insights can be delayed up to 48 hours. An omitted or empty metric is unavailable, not zero. Compare with historical snapshots and the account's own median; do not invent demographics or benchmarks.",
         });
       } catch {
         return result({ error: "Could not retrieve Instagram data. Verify the encrypted token, APP_ENCRYPTION_KEY, and Meta API permissions." });
