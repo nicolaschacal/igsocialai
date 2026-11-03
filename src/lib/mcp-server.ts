@@ -208,6 +208,56 @@ export const mcpHandler = createMcpHandler(() => {
   );
 
   server.registerTool(
+    "daily_reports_list",
+    {
+      title: "List recent creator reports",
+      description: "Retrieve the creator's saved daily account and niche reports for historical comparison.",
+      inputSchema: z.object({ limit: z.number().int().min(1).max(30).default(7) }),
+    },
+    async ({ limit }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const accounts = await db`SELECT creator_id FROM instagram_accounts ORDER BY connected_at DESC LIMIT 1`;
+        const creatorId = accounts[0]?.creator_id;
+        if (!creatorId) return result({ reports: [] });
+        const rows = await db`SELECT report_date, account_snapshot, niche_snapshot, recommendations, created_at FROM daily_reports WHERE creator_id = ${creatorId} ORDER BY report_date DESC LIMIT ${limit}`;
+        return result({ reports: rows });
+      } catch {
+        return result({ error: "Could not read daily creator reports." });
+      }
+    },
+  );
+
+  server.registerTool(
+    "daily_report_save",
+    {
+      title: "Save today's creator report",
+      description: "Persist measured Instagram metrics, niche observations, and recommendations so tomorrow's briefing can compare against real history.",
+      inputSchema: z.object({
+        reportDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/),
+        accountSnapshot: z.record(z.string(), z.unknown()),
+        nicheSnapshot: z.record(z.string(), z.unknown()),
+        recommendations: z.array(z.string().max(1000)).max(20),
+      }),
+    },
+    async ({ reportDate, accountSnapshot, nicheSnapshot, recommendations }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const accounts = await db`SELECT creator_id FROM instagram_accounts ORDER BY connected_at DESC LIMIT 1`;
+        const creatorId = accounts[0]?.creator_id;
+        if (!creatorId) return result({ saved: false, reason: "No creator profile is linked to the Instagram account." });
+        const rows = await db`INSERT INTO daily_reports (creator_id, report_date, account_snapshot, niche_snapshot, recommendations)
+          VALUES (${creatorId}, ${reportDate}, ${JSON.stringify(accountSnapshot)}::jsonb, ${JSON.stringify(nicheSnapshot)}::jsonb, ${JSON.stringify(recommendations)}::jsonb)
+          ON CONFLICT (creator_id, report_date) DO UPDATE SET account_snapshot = EXCLUDED.account_snapshot, niche_snapshot = EXCLUDED.niche_snapshot, recommendations = EXCLUDED.recommendations
+          RETURNING report_date, created_at`;
+        return result({ saved: true, report: rows[0] });
+      } catch {
+        return result({ saved: false, error: "Could not save the daily creator report." });
+      }
+    },
+  );
+
+  server.registerTool(
     "elevenlabs_generate_voiceover",
     {
       title: "Generate voiceover with ElevenLabs",
