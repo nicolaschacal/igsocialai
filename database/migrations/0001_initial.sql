@@ -135,3 +135,18 @@ ALTER TABLE content_ideas ADD COLUMN IF NOT EXISTS requires_follow BOOLEAN NOT N
 ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS instagram_media_id TEXT;
 ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS content_idea_id UUID REFERENCES content_ideas(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS automation_rules_media_keyword_idx ON automation_rules(instagram_media_id, keyword) WHERE enabled = TRUE;
+
+-- Track a commenter through the opt-in / follow-check / resource-delivery flow.
+CREATE TABLE IF NOT EXISTS automation_contact_states (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  automation_rule_id UUID NOT NULL REFERENCES automation_rules(id) ON DELETE CASCADE,
+  contact_igsid TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'awaiting_user_action' CHECK (status IN ('awaiting_user_action', 'awaiting_follow', 'delivered', 'failed')),
+  last_interaction_at TIMESTAMPTZ,
+  last_follow_check BOOLEAN,
+  delivered_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (automation_rule_id, contact_igsid)
+);
+CREATE INDEX IF NOT EXISTS automation_contact_states_contact_idx ON automation_contact_states(contact_igsid, updated_at DESC);
