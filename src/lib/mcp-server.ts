@@ -1,4 +1,5 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
+import { createHash } from "node:crypto";
 import * as z from "zod/v4";
 import { db, databaseUnavailableMessage } from "@/lib/db";
 import { decryptSecret } from "@/lib/crypto";
@@ -289,6 +290,123 @@ export const mcpHandler = createMcpHandler(() => {
         return result({ updated: true, idea: rows[0], nextStep: "Create the script, storyboard, voiceover and video draft. Ask for explicit approval before publishing." });
       } catch {
         return result({ error: "Could not update idea. Apply the initial database migration first." });
+      }
+    },
+  );
+
+  server.registerTool(
+    "content_idea_update",
+    {
+      title: "Update a content production draft",
+      description: "Save the final script, scene-by-scene storyboard, caption and keyword CTA for a selected content idea. This does not approve or publish it.",
+      inputSchema: z.object({
+        ideaId: z.string().uuid(),
+        script: z.string().min(20).max(12000).optional(),
+        storyboard: z.array(z.object({
+          sceneNumber: z.number().int().min(1).max(30),
+          durationSeconds: z.number().positive().max(20),
+          visualDirection: z.string().min(2).max(800),
+          onScreenText: z.string().max(300).optional(),
+          voiceoverLine: z.string().max(1200).optional(),
+        })).max(30).optional(),
+        caption: z.string().max(3000).optional(),
+        cta: z.string().max(500).optional(),
+        keyword: z.string().max(80).optional(),
+      }).refine((value) => Object.keys(value).some((key) => key !== "ideaId" && value[key as keyof typeof value] !== undefined)),
+    },
+    async ({ ideaId, script, storyboard, caption, cta, keyword }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const storyboardJson = storyboard ? JSON.stringify(storyboard) : null;
+        const rows = await db`UPDATE content_ideas SET
+          script = COALESCE(${script ?? null}, script),
+          storyboard = COALESCE(${storyboardJson}::jsonb, storyboard),
+          caption = COALESCE(${caption ?? null}, caption),
+          cta = COALESCE(${cta ?? null}, cta),
+          keyword = COALESCE(${keyword ?? null}, keyword),
+          status = 'in_production',
+          updated_at = NOW()
+          WHERE id = ${ideaId} AND status IN ('selected', 'in_production', 'ready_for_review')
+          RETURNING id, title, format, script, storyboard, caption, cta, keyword, status`;
+        if (!rows.length) return result({ updated: false, reason: "Idea not found or not in a production state." });
+        return result({ updated: true, idea: rows[0], nextStep: "Generate the voiceover and render the video. Then request explicit creator approval." });
+      } catch {
+        return result({ updated: false, error: "Could not update the content idea." });
+      }
+    },
+  );
+
+  server.registerTool(
+    "content_approval_request",
+    {
+      title: "Request approval to publish content",
+      description: "Create a pending approval for a completed content version. The approval is bound to a SHA-256 hash of the idea and its media assets. It never publishes by itself.",
+      inputSchema: z.object({
+        ideaId: z.string().uuid(),
+        action: z.enum(["publish_reel", "publish_post", "publish_story"]),
+      }),
+    },
+    async ({ ideaId, action }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const ideas = await db`SELECT id, format, title, hook, summary, script, storyboard, caption, cta, keyword, status FROM content_ideas WHERE id = ${ideaId} LIMIT 1`;
+        const idea = ideas[0];
+        if (!idea) return result({ requested: false, reason: "Content idea not found." });
+        const assets = await db`SELECT id, asset_type, storage_url, metadata FROM media_assets WHERE content_idea_id = ${ideaId} ORDER BY created_at ASC`;
+        const hasVideo = assets.some((asset) => asset.asset_type === "video");
+        const hasCover = assets.some((asset) => asset.asset_type === "cover");
+        if (action === "publish_reel" && !hasVideo) {
+          return result({ requested: false, reason: "A rendered video asset is required before requesting Reel approval." });
+        }
+        if (!idea.caption) return result({ requested: false, reason: "A caption is required before requesting approval." });
+
+        const contentHash = createHash("sha256").update(JSON.stringify({
+          idea,
+          assets: assets.map((asset) => ({ id: asset.id, type: asset.asset_type, storageUrl: asset.storage_url, metadata: asset.metadata })),
+        })).digest("hex");
+        await db`UPDATE content_ideas SET status = 'ready_for_review', updated_at = NOW() WHERE id = ${ideaId}`;
+        const approvals = await db`INSERT INTO approvals (content_idea_id, action, content_hash, status) VALUES (${ideaId}, ${action}, ${contentHash}, 'pending') RETURNING id, action, status, created_at`;
+        return result({
+          requested: true,
+          approval: approvals[0],
+          content: { title: idea.title, format: idea.format, caption: idea.caption, cta: idea.cta, keyword: idea.keyword },
+          assets: assets.map((asset) => ({ id: asset.id, type: asset.asset_type, url: asset.storage_url })),
+          hasCover,
+          contentHash,
+          note: "Show the preview and all publishing details to the creator. Only call content_approval_decide with decision=approve after they explicitly say yes.",
+        });
+      } catch {
+        return result({ requested: false, error: "Could not create approval request." });
+      }
+    },
+  );
+
+  server.registerTool(
+    "content_approval_decide",
+    {
+      title: "Record creator approval decision",
+      description: "Record the creator's explicit approval or rejection for one exact content version. Approval alone does not publish; a separate publish tool must validate the content hash again.",
+      inputSchema: z.object({
+        approvalId: z.string().uuid(),
+        decision: z.enum(["approve", "reject"]),
+      }),
+    },
+    async ({ approvalId, decision }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      try {
+        const status = decision === "approve" ? "approved" : "rejected";
+        const rows = await db`UPDATE approvals SET status = ${status}, approved_by = ${decision === "approve" ? "creator" : null}, approved_at = ${decision === "approve" ? new Date().toISOString() : null} WHERE id = ${approvalId} AND status = 'pending' RETURNING id, content_idea_id, action, content_hash, status, approved_at`;
+        if (!rows.length) return result({ recorded: false, reason: "Approval request not found or already decided." });
+        const approval = rows[0];
+        await db`UPDATE content_ideas SET status = ${decision === "approve" ? "approved" : "in_production"}, updated_at = NOW() WHERE id = ${approval.content_idea_id}`;
+        return result({
+          recorded: true,
+          approval,
+          published: false,
+          nextStep: decision === "approve" ? "The exact content version is approved. Call the publish tool only after verifying its content hash and required media." : "The draft was rejected. Revise it and request approval again.",
+        });
+      } catch {
+        return result({ recorded: false, error: "Could not record the approval decision." });
       }
     },
   );
