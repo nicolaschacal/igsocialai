@@ -19,7 +19,8 @@
 - [ ] Implement authenticated remote MCP endpoint
 - [ ] Add tools: get_account, get_media, get_insights, audit_profile, propose_ideas
 - [ ] Add draft tools: create_script, create_storyboard, create_caption, create_cover_brief
-- [ ] Add review tools: list_approvals, approve_content, request_revision
+- [x] Add draft update and version-bound creator approval request/decision tools
+- [ ] Add publish tool that validates the approved content hash
 - [ ] Add execution tools: publish_approved_content, schedule_approved_content
 - [ ] Enforce server-side approval checks
 
