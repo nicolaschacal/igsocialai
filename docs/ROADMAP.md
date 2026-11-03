@@ -24,8 +24,8 @@
 - [ ] Enforce server-side approval checks
 
 ## M3 — Media production
-- [ ] Define versioned scene-manifest JSON
-- [ ] Build reusable Remotion templates
+- [x] Define a versioned scene-manifest shape for the first Remotion template
+- [x] Build first local 9:16 Remotion motion-graphics template
 - [ ] Add ElevenLabs voice provider adapter
 - [ ] Render preview and store media assets
 - [ ] Generate cover image and caption package
