@@ -24,6 +24,7 @@ export const RemotionRoot: React.FC = () => (
     id="DailyReel"
     component={DailyReel}
     durationInFrames={defaultProps.durationInFrames}
+    calculateMetadata={({ props }) => ({ durationInFrames: props.durationInFrames })}
     fps={30}
     width={1080}
     height={1920}
