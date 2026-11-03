@@ -38,6 +38,7 @@ async function processNextJob() {
     ], {
       encoding: "utf8",
       stdio: "pipe",
+      maxBuffer: 10 * 1024 * 1024,
       shell: process.platform === "win32",
     });
 
