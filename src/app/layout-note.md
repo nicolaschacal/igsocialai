@@ -1,0 +1,1 @@
+This app is an early scaffold. Dashboard numbers and content tasks are illustrative placeholders, not live Instagram data. Replace them with authenticated API data before presenting as connected.
