@@ -234,7 +234,7 @@ export const mcpHandler = createMcpHandler(() => {
       title: "Save today's creator report",
       description: "Persist measured Instagram metrics, niche observations, and recommendations so tomorrow's briefing can compare against real history.",
       inputSchema: z.object({
-        reportDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/),
+        reportDate: z.string().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/),
         accountSnapshot: z.record(z.string(), z.unknown()),
         nicheSnapshot: z.record(z.string(), z.unknown()),
         recommendations: z.array(z.string().max(1000)).max(20),
