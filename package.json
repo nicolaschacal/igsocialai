@@ -8,7 +8,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "studio": "remotion studio src/video/index.ts",
-    "render:reel": "node scripts/render-reel.mjs"
+    "render:reel": "node scripts/render-reel.mjs",
+    "worker:render": "node scripts/render-worker.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
