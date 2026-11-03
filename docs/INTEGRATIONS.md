@@ -17,7 +17,7 @@ Meta app credentials must come from the Instagram API / Business Login setup. Ad
 
 The OAuth implementation exchanges the authorization code for a short-lived token, exchanges that for a long-lived token, encrypts it using AES-256-GCM, and stores it in Neon. Token refresh, account insights, publishing, comments, messaging, and webhooks remain separate implementation milestones.
 
-Private replies, DMs and messaging are subject to Meta permissions, recipient interaction requirements and messaging windows. Do not promise arbitrary cold DMs. Follow verification is not assumed to be available; verify the exact endpoint/permission before implementing a "must follow" gate.
+Private replies, DMs and messaging are subject to Meta permissions, recipient interaction requirements and messaging windows. Do not promise arbitrary cold DMs. Follow verification is possible in the Instagram Login messaging flow through the Messaging User Profile API field `is_user_follow_business`, provided the app has `instagram_business_manage_messages` and an IGSID from an existing messaging context. It cannot be used to check arbitrary usernames or enumerate followers. A comment's one private reply does not itself open the normal 24-hour messaging window; the person must respond or tap a supported reply action before follow-up messages and resource delivery.
 
 ## ElevenLabs
 The voice provider is optional and is configured using a server-side API key and voice ID. The free tier has a finite monthly credit allowance and terms/usage restrictions; do not claim unlimited free generation.
