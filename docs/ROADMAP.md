@@ -38,9 +38,9 @@
 - [ ] FAQ policies, human handoff, and audit log
 
 ## M5 — Daily operations
-- [ ] Durable scheduler and retry queue
-- [ ] Morning performance report
-- [ ] Daily content proposal job
+- [ ] Durable retry queue for webhooks, Meta operations and media jobs (Claude Cowork handles the daily AI schedule)
+- [x] Morning performance briefing delegated to Claude Cowork scheduled tasks
+- [x] Daily briefing and three content proposals delegated to Claude Cowork scheduled tasks
 - [ ] Approved publishing calendar
 - [ ] Usage limits and cost controls
 
