@@ -129,6 +129,100 @@ export const mcpHandler = createMcpHandler(() => {
   );
 
   server.registerTool(
+    "elevenlabs_generate_voiceover",
+    {
+      title: "Generate voiceover with ElevenLabs",
+      description: "Generate an MP3 voiceover from an approved script using the configured ElevenLabs voice. Stores the audio as a private media asset. This does not publish content.",
+      inputSchema: z.object({
+        script: z.string().min(20).max(10000),
+        contentIdeaId: z.string().uuid().optional(),
+        voiceId: z.string().min(1).max(120).optional(),
+        modelId: z.string().min(1).max(120).optional(),
+      }),
+    },
+    async ({ script, contentIdeaId, voiceId, modelId }) => {
+      if (!db) return result({ error: databaseUnavailableMessage() });
+      const apiKey = process.env.ELEVENLABS_API_KEY;
+      const selectedVoice = voiceId || process.env.ELEVENLABS_VOICE_ID;
+      const selectedModel = modelId || process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
+      if (!apiKey || !selectedVoice) {
+        return result({ error: "ElevenLabs is not configured. Add ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID to the server environment." });
+      }
+
+      try {
+        const endpoint = new URL(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(selectedVoice)}`);
+        endpoint.searchParams.set("output_format", "mp3_44100_128");
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "xi-api-key": apiKey,
+            "content-type": "application/json",
+            accept: "audio/mpeg",
+          },
+          body: JSON.stringify({
+            text: script,
+            model_id: selectedModel,
+            voice_settings: {
+              stability: 0.48,
+              similarity_boost: 0.78,
+              style: 0.12,
+              use_speaker_boost: true,
+            },
+          }),
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          const providerError = await response.text();
+          return result({
+            generated: false,
+            providerStatus: response.status,
+            error: providerError.slice(0, 500),
+            note: "Check ElevenLabs account credits, API access, voice permissions, and model availability.",
+          });
+        }
+
+        const audio = Buffer.from(await response.arrayBuffer());
+        if (!audio.byteLength || audio.byteLength > 15 * 1024 * 1024) {
+          return result({ generated: false, error: "Audio output was empty or exceeded the 15 MB development storage limit." });
+        }
+
+        const metadata = JSON.stringify({
+          provider: "elevenlabs",
+          modelId: selectedModel,
+          voiceId: selectedVoice,
+          characters: script.length,
+          bytes: audio.byteLength,
+        });
+        const assets = await db`INSERT INTO media_assets (content_idea_id, asset_type, storage_url, metadata) VALUES (${contentIdeaId ?? null}, 'voiceover', 'pending', ${metadata}::jsonb) RETURNING id`;
+        const assetId = String(assets[0]?.id ?? "");
+        if (!assetId) throw new Error("media_asset_insert_failed");
+
+        const fileName = `voiceover-${assetId}.mp3`;
+        await db`INSERT INTO media_asset_blobs (asset_id, mime_type, file_name, content_base64) VALUES (${assetId}, 'audio/mpeg', ${fileName}, ${audio.toString("base64")})`;
+
+        const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+        const downloadUrl = `${appUrl}/api/media/assets/${assetId}`;
+        await db`UPDATE media_assets SET storage_url = ${downloadUrl} WHERE id = ${assetId}`;
+
+        return result({
+          generated: true,
+          assetId,
+          downloadUrl,
+          mimeType: "audio/mpeg",
+          fileName,
+          characters: script.length,
+          bytes: audio.byteLength,
+          modelId: selectedModel,
+          note: "Voiceover generated and stored. Download it with the protected asset URL, then render the Reel locally. No Instagram post has been published.",
+        });
+      } catch {
+        return result({ generated: false, error: "Voiceover generation or asset storage failed. Check provider access, Neon connectivity, and media_asset_blobs migration." });
+      }
+    },
+  );
+
+  server.registerTool(
     "content_ideas_list",
     {
       title: "List content ideas",
