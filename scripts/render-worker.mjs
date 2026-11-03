@@ -25,7 +25,7 @@ async function processNextJob() {
         FOR UPDATE SKIP LOCKED
         LIMIT 1
       )
-      RETURNING id, content_idea_id, voiceover_asset_id`;
+      RETURNING id, content_idea_id, voiceover_asset_id, started_at`;
 
     if (!jobs.length) return;
     const job = jobs[0];
@@ -48,7 +48,7 @@ async function processNextJob() {
       return;
     }
 
-    const assets = await sql`SELECT id, asset_type FROM media_assets WHERE content_idea_id = ${job.content_idea_id} AND created_at >= ${new Date().toISOString()}::timestamptz - INTERVAL '30 minutes' AND asset_type IN ('video', 'cover') ORDER BY created_at DESC`;
+    const assets = await sql`SELECT id, asset_type FROM media_assets WHERE content_idea_id = ${job.content_idea_id} AND created_at >= ${job.started_at} AND asset_type IN ('video', 'cover') ORDER BY created_at DESC`;
     const video = assets.find((asset) => asset.asset_type === "video");
     const cover = assets.find((asset) => asset.asset_type === "cover");
     if (!video || !cover) {
