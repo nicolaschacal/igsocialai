@@ -23,7 +23,7 @@ The primary product surface is Claude Cowork, not a conventional social-media da
 - Receive comment and messaging events through Meta webhooks.
 - Match exact keyword rules to the Reel/post that owns the keyword.
 - Send the supported private reply only within Meta's API constraints and messaging window.
-- Deliver the resource only after the requested follow condition is verified through a supported official API capability. If follower verification is unavailable for that account/app/permission, tell the user honestly and use a fallback such as a follow link plus manual/alternative verification. Never pretend to verify a follow.
+- For a keyword comment, send the one permitted private reply with a clear prompt and a quick-reply action such as “Ya seguí”. After the person taps/replies and creates a messaging context, use the Instagram Messaging User Profile API field `is_user_follow_business` (requires Instagram Login, `instagram_business_manage_messages`, and the person's IGSID) to verify the follow. If false, ask them to follow and tap again; if true, deliver the resource within the active messaging window. Never attempt to look up arbitrary usernames or enumerate followers.
 - Answer routine questions only from the creator's approved knowledge and response policies.
 - Escalate sensitive, ambiguous, refund, complaint, or high-risk conversations to the creator.
 - Keep an audit trail and rate limits; never spam users.
