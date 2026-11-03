@@ -10,7 +10,8 @@ const steps = [
 
 export default function Home() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const mcpUrl = `${appUrl.replace(/\\/$/, "")}/api/mcp`;
+  const baseUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
+  const mcpUrl = `${baseUrl}/api/mcp`;
   const ready = steps.filter((step) => step.configured).length;
 
   return (
